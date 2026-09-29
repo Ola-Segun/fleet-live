@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FleetSnapshot, WorkerToMain } from "@fleet/transport";
+import type { FleetSnapshot, RowsMessage, WorkerToMain } from "@fleet/transport";
+import { FleetGpuState } from "@/lib/gpu-state";
 import type { FleetConfig, MainToWorker } from "@/lib/worker-messages";
 
 export type FleetStatus = Extract<WorkerToMain, { type: "status" }>;
 export type SnapshotListener = (snapshot: FleetSnapshot) => void;
+export type RowsListener = (rows: RowsMessage, receivedAt: number) => void;
 
 /**
  * Owns the fleet Worker for as long as the component is mounted.
@@ -21,13 +23,21 @@ export function useFleet(config: FleetConfig) {
   const [error, setError] = useState<string | null>(null);
   const latest = useRef<FleetSnapshot | null>(null);
   const listeners = useRef(new Set<SnapshotListener>());
+  const rowsListeners = useRef(new Set<RowsListener>());
+  // Created once, fed from the first message: see FleetGpuState for why the layer doesn't own it.
+  const [gpu] = useState(() => new FleetGpuState());
   const key = JSON.stringify(config);
 
   useEffect(() => {
     const worker = new Worker(new URL("../../workers/fleet.worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (event: MessageEvent<WorkerToMain>) => {
       const message = event.data;
-      if (message.type === "snapshot") {
+      if (message.type === "rows") {
+        // 10 Hz, straight to the truck layer. Never through React.
+        const receivedAt = performance.now();
+        gpu.apply(message, receivedAt);
+        for (const listener of rowsListeners.current) listener(message, receivedAt);
+      } else if (message.type === "snapshot") {
         latest.current = message.snapshot;
         for (const listener of listeners.current) listener(message.snapshot);
       } else {
@@ -41,7 +51,7 @@ export function useFleet(config: FleetConfig) {
       worker.postMessage({ type: "stop" } satisfies MainToWorker);
       worker.terminate();
     };
-  }, [key]);
+  }, [key, gpu]);
 
   const subscribe = useCallback((listener: SnapshotListener) => {
     listeners.current.add(listener);
@@ -51,5 +61,12 @@ export function useFleet(config: FleetConfig) {
     };
   }, []);
 
-  return { status, error, subscribe };
+  const subscribeRows = useCallback((listener: RowsListener) => {
+    rowsListeners.current.add(listener);
+    return () => {
+      rowsListeners.current.delete(listener);
+    };
+  }, []);
+
+  return { status, error, subscribe, subscribeRows, gpu };
 }

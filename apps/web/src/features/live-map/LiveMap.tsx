@@ -4,9 +4,13 @@ import { useEffect, useRef } from "react";
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { formatCamera, type Camera } from "@/lib/camera-url";
+import type { FleetGpuState } from "@/lib/gpu-state";
 import { fleetPerf } from "@/lib/perf";
 import { snapshotToGeoJSON } from "@/lib/snapshot-geojson";
 import type { SnapshotListener } from "./use-fleet";
+import { VehicleLayer, type VehicleLayerStats } from "./vehicle-layer";
+
+export type TruckLayerKind = "gl" | "baseline" | "off";
 
 /** Free, no API key, commercial use allowed; attribution required (shown by MapLibre's control). */
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
@@ -14,19 +18,20 @@ const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 interface Props {
   initialCamera: Camera;
   subscribe: (listener: SnapshotListener) => () => void;
-  /** `?trucks=off`: the map without the truck layer, so the layer's own cost can be measured by difference. */
-  showTrucks: boolean;
+  gpu: FleetGpuState;
+  /**
+   * `gl` (default): the WebGL layer, interpolating on the GPU every frame.
+   * `baseline` (`?layer=baseline`): the stock GeoJSON layer from Layer 6, kept to compare against.
+   * `off` (`?trucks=off`): the map alone, so each layer's cost can be measured by difference.
+   */
+  layer: TruckLayerKind;
 }
 
 /**
- * The base map, and the **baseline** truck layer.
- *
- * Trucks are drawn here the stock way: a GeoJSON source and a circle layer,
- * refreshed with `setData` twice a second. It works, and it exists to be
- * measured. Layer 7 replaces it with a WebGL layer that interpolates on the GPU
- * every frame, and has to beat these numbers.
+ * The base map and the truck layer: the WebGL layer by default, or the stock
+ * GeoJSON baseline it replaced, kept so the two can be compared on the same page.
  */
-export default function LiveMap({ initialCamera, subscribe, showTrucks }: Props) {
+export default function LiveMap({ initialCamera, subscribe, gpu, layer }: Props) {
   const container = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,7 +57,36 @@ export default function LiveMap({ initialCamera, subscribe, showTrucks }: Props)
 
     let unsubscribe: (() => void) | undefined;
     map.on("load", () => {
-      if (!showTrucks) return;
+      if (layer === "off") return;
+      if (layer === "gl") {
+        const stats: VehicleLayerStats = { frames: 0, renderMs: 0, uploads: 0, contextRestores: 0, layersAdded: 1, skipped: 0 };
+        perf.layer = stats;
+        map.addLayer(new VehicleLayer(gpu, stats));
+        // MapLibre 5 destroys the style when the WebGL context is lost, and does not
+        // restore custom layers. Once it has reloaded the style, add a fresh one.
+        map.on("webglcontextrestored", () => {
+          stats.contextRestores++;
+          // `isStyleLoaded()` also waits for every tile, and `styledata` stops firing
+          // before tiles finish, so waiting on both never succeeded. Adding a layer only
+          // needs the style itself: try on each style and idle event until it takes.
+          const readd = () => {
+            try {
+              if (!map.getLayer("fleet-vehicles")) {
+                map.addLayer(new VehicleLayer(gpu, stats));
+                stats.layersAdded++;
+              }
+              map.off("styledata", readd);
+              map.off("idle", readd);
+            } catch {
+              // "Style is not done loading": wait for the next event.
+            }
+          };
+          map.on("styledata", readd);
+          map.on("idle", readd);
+          readd();
+        });
+        return;
+      }
       map.addSource("vehicles", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({
         id: "vehicles",
@@ -92,7 +126,7 @@ export default function LiveMap({ initialCamera, subscribe, showTrucks }: Props)
     };
     // The initial camera is read once; after that the map owns it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subscribe, showTrucks]);
+  }, [subscribe, gpu, layer]);
 
   // MapLibre adds `.maplibregl-map { position: relative }` to its container, which
   // overrode `absolute inset-0` and collapsed it to 0 px tall: a blank map with a

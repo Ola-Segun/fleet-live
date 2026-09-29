@@ -240,6 +240,16 @@ describe("the feed", () => {
     expect(s.added + s.duplicates + s.tooOld).toBe(s.pings);
   });
 
+  it("reports which vehicles changed since it was last asked, then forgets them", () => {
+    const feed = new Feed(RAW_OPTIONS);
+    feed.ingest(frame(0, T0 + 100, [eastbound(0), eastbound(0, { vehicleId: 2 })]));
+    expect([...feed.drainChanged()].sort()).toEqual([1, 2]);
+    feed.ingest(frame(1, T0 + 200, [eastbound(0)])); // a duplicate changes nothing
+    expect(feed.drainChanged().size).toBe(0);
+    feed.ingest(frame(2, T0 + 1200, [eastbound(1)]));
+    expect([...feed.drainChanged()]).toEqual([1]);
+  });
+
   it("counts frames it never received", () => {
     const feed = new Feed(RAW_OPTIONS);
     feed.ingest(frame(7, T0, []));

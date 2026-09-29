@@ -14,8 +14,8 @@ how it's engineered and proved.
 | 4 | The feed: ordering, clocks, smoothing (`packages/feed`) | Turns a messy feed into a clean one; the correctness core | **Done** |
 | 5 | Transport: Worker core, socket server, demo mode (`packages/transport`, `apps/sim-server`) | Keeps 5,000 updates a second off the main thread, and survives dropped connections | **Done** |
 | 6 | Next.js shell, base map, baseline truck layer (`apps/web`) | The frame everything visible sits in, and a measured baseline for Layer 7 to beat | **Done** |
-| 7 | WebGL2 vehicle layer | Draws 5,000 moving trucks smoothly, in one draw call | Next |
-| 8 | Product UI | What a dispatcher actually uses: search, drawer, list, alerts, geofences | |
+| 7 | WebGL2 truck layer (`packages/gl`, `apps/web`) | Draws 5,000 moving trucks smoothly, in one draw call | **Done** |
+| 8 | Product UI | What a dispatcher actually uses: search, drawer, list, alerts, geofences | Next |
 | 9 | Replay | Answers "what happened at 14:05?" using the same renderer | |
 | 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | |
 
@@ -712,3 +712,150 @@ and interpolates on the GPU, with no re-tiling at all.
   `?mode=network`.
 - To measure: `pnpm --filter @fleet/web build`, then
   `pnpm --filter @fleet/web start -p 3100`, then `pnpm smoke:web`.
+
+---
+
+## Layer 7 · The WebGL2 truck layer
+
+**Why this layer exists**
+
+- **The baseline stalls the page.** Layer 6 measured the stock GeoJSON layer at
+  20–29 main-thread long tasks per 10 s, from MapLibre re-tiling and
+  re-uploading 5,000 points on every refresh. A dispatcher feels that as jank
+  on every pan and zoom.
+- **The baseline jumps.** It shows positions at 2 Hz, so trucks hop. The whole
+  point of rendering in the past (Layer 4) is that there are always two known
+  points to move between. That movement has to happen every frame, which means
+  on the GPU.
+- **The design's two precision traps live here.** Float32 positions wobble by
+  2.37 m in Lagos, and float32 epoch time steps by 128 s. Both have to be solved
+  where the GPU reads the data.
+- **Why now:** Layers 1–6 deliver clean, ordered, smoothed tracks to the page.
+  This is the layer that makes them visible at full frame rate.
+
+**What exists**
+
+| Part | What it does |
+| --- | --- |
+| `packages/gl/layout.ts` | The texture layout: 9 RGBA32F texels per truck (8 samples of x, y, t, heading + metadata), 200 trucks per row (1,800 texels, under WebGL2's guaranteed 2,048), relative-to-centre positions, session seconds, velocity via degrees on the feed's sphere |
+| `packages/gl/reference.ts` | `gpuEstimate()`: the vertex shader's algorithm in TypeScript, in float32 arithmetic, so it can be tested |
+| `packages/gl/shaders.ts` | The GLSL. The vertex shader finds the two samples around the display time, interpolates or extrapolates, and places a rotated, screen-sized quad. The fragment shader draws a distance-field shape per status |
+| `packages/gl/matrix.ts` | `rtcMatrix`: folds the origin into MapLibre's matrix in float64 |
+| `packages/gl/clock.ts` | `DisplayClock`: display time every animation frame, steered by at most 10% by the Worker's reports, never backwards |
+| `packages/gl/mirror.ts` | The page's copy of the texture: changed rows written in, one upload per frame |
+| `transport/core.ts` | `publishRows()`: 10 Hz, only changed trucks, permanent slots, transferred buffers |
+| `apps/web/lib/gpu-state.ts` | `FleetGpuState`: the texture copy, clock and slots, owned by the page from the first message |
+| `apps/web/features/live-map/vehicle-layer.ts` | The MapLibre custom layer: one upload at most, a dozen uniforms, one instanced draw |
+| `apps/web/features/live-map/PerfHud.tsx` | `?hud=1`: fps, the layer's CPU per frame, uploads and rows per second |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Interpolation in the vertex shader** | Per-frame work lands on the GPU. The CPU touches a truck only when new samples arrive |
+| **One instanced draw, no per-truck attributes** | Instance *i* is slot *i*, and its data comes from `texelFetch`. The only vertex buffer is the quad's four corners |
+| **Only changed trucks cross the thread boundary** | About 4,300 rows a second in about 10 messages. The page writes them into its copy and uploads the whole 720 KB texture once, a single GPU call instead of hundreds |
+| **Permanent slots** | A truck's texture position is fixed at first sight, so an upload never reshuffles anything |
+| **Relative-to-centre positions, matrix in float64** | See [ADR 0006](adr/0006-rtc-coordinates-and-session-time.md). 2.37 m float32 steps become 2.3 mm steps |
+| **Session-relative seconds** | Epoch seconds step by 128 s in float32; session seconds step by 1/128 s after a day |
+| **Velocity through degrees on the feed's sphere** | It matches `estimate()` exactly. Web Mercator's own sphere differed by 0.11% |
+| **The display clock slews and never goes backwards** | Reports arrive late by varying amounts. Snapping to each would shudder the fleet, and a truck moving backwards for one frame looks like a bug |
+| **The page owns the GPU state, not the layer** | Rows carry only changes, and the map loads after the Worker starts. A layer-owned copy would miss early rows, leaving parked trucks invisible for 30 s and the slot list wrong |
+| **Shapes, not just colours** | Arrow = moving, amber arrow = projected or holding, grey dot = parked, red ring = stale. Distance-field shapes stay crisp at any pixel density. At low zoom everything becomes a dot |
+| **`UNPACK_FLIP_Y` and `UNPACK_PREMULTIPLY_ALPHA` reset before upload** | MapLibre sets them for its images and can leave them on. With an array source they must be off |
+| **Reduced motion** | Under `prefers-reduced-motion` the layer doesn't animate continuously. The fleet steps every 2 s |
+| **Context-loss recovery by the map's owner** | MapLibre 5 destroys the style and doesn't restore custom layers. LiveMap re-adds a fresh layer, which draws every truck at once from `FleetGpuState` |
+
+**How it is tested:** 12 `@fleet/gl` tests, 2 `FleetGpuState` tests, and 1 new
+transport test. 138 across the workspace.
+
+- **The correspondence test.** 150 simulated trucks go through the Layer 4 feed
+  and are packed exactly as the GPU receives them. At 41 display times each
+  (about 6,000 comparisons, across interpolated, extrapolated, holding, parked
+  and stale), `gpuEstimate()` must give **the same mode as `estimate()`, and a
+  position within 5 cm**.
+- **Both precision traps, with the next representable float32.**
+  - Absolute Mercator x in Lagos steps by exactly 2⁻²⁴ (2.37 m).
+  - An offset 22 km out steps by 2⁻³⁴ (2.3 mm).
+  - Epoch seconds lose a whole minute in float32; session seconds after a day
+    still resolve 1/128 s.
+- **Packing.** The newest 8 are kept oldest-first with front padding. North
+  velocity is negative Mercator y, and 10 m/s north converts back to 10 m. The
+  parked flag is set by ignition or speed.
+- **The matrix.** An offset through `rtcMatrix` lands exactly where the
+  absolute position lands through the original matrix (property test).
+- **The clock.** It never goes backwards under any jitter (property test), it
+  slews at most 10% of elapsed time, and it jumps on a gap of minutes.
+- **The mirror and GPU state.**
+  - Rows land at the texel the shader fetches.
+  - Growth keeps existing slots in place.
+  - Rows that arrive before any layer exists are kept.
+  - A new epoch clears everything.
+- **In Chrome** (`pnpm smoke:web`): see the table below, plus a deliberately
+  lost and restored WebGL context, after which the layer draws again.
+- **The suite was mutation-checked.** Three deliberate bugs were introduced:
+  1. the north velocity sign flipped
+  2. no extrapolation
+  3. the matrix forgetting the origin
+
+  All three failed the suite.
+
+**Measured** (the built app in headless Chrome with software WebGL, 4,952
+trucks, 10 s of steady state after start-up):
+
+| Truck layer | Long tasks | Frame interval p50 / p95 / p99 | Layer CPU per frame |
+| --- | --- | --- | --- |
+| Layer 6 GeoJSON baseline (`?layer=baseline`) | 20 | 16.7 / 16.8 / **66.7 ms** (54 fps) | hidden in MapLibre |
+| **WebGL layer** | **0–1** | 16.7 / 16.8 / **16.9–17.1 ms** (59–60 fps) | **0.1 ms p50, 0.3–0.4 ms p95** |
+| No trucks (`?trucks=off`) | 0 | 16.7 / 16.8 / 17.0 ms (60 fps) | — |
+
+- The WebGL layer is indistinguishable from drawing no trucks, while moving
+  every truck every frame.
+- The CPU figures sit at Chrome's 0.1 ms timer resolution, which applies
+  without cross-origin isolation. They mean "at or below 0.1 ms", and the HUD
+  says "< 0.1".
+- One run showed a single 170 ms long task and another none, so the table
+  gives the range.
+- **After a lost context:** 1 restore, a fresh layer added, then 61 frames in
+  the next second with every truck back on screen.
+
+**Found while building**
+
+1. **Two spheres, 0.11% apart.** The feed converts metres to degrees on Earth's
+   mean radius, and the first packing converted velocity with Web Mercator's
+   equatorial sphere. The correspondence test caught the GPU disagreeing with
+   the feed by 5.6 cm after 5 s of extrapolation. Velocity now goes through
+   degrees on the same sphere, with the radius imported from one place.
+2. **A layer-owned texture would have lost the first rows.** Rows carry only
+   changes, and the map loads after the Worker starts. It was caught on paper
+   before any browser run, and fixed by moving the state to the page
+   (`FleetGpuState`) with a test for rows arriving before any layer.
+3. **Context loss removes the layer, and its listener with it.** The first
+   recovery listened for `webglcontextrestored` inside the layer. MapLibre 5
+   destroys the style on loss, which removes the layer and the listener, as its
+   own console warning says. Recovery moved to the map's owner.
+4. **Then the re-add waited for the wrong signal.** `isStyleLoaded()` also
+   waits for every tile, and `styledata` stops firing before tiles finish, so
+   the layer was never re-added. The base map came back and the trucks didn't.
+   The re-add now retries on style and idle events until MapLibre accepts it.
+5. **"Live" is not "drawing".** The status reads Live before the map has
+   loaded, so the first context-loss test broke the context before the layer
+   existed. Tests now wait for the layer's own frame counter.
+6. **Test mistakes, corrected by maths, not by loosening.**
+   - A precision test stepped by 1e-7, which is 1.7 float32 steps, and reported
+     4.75 m.
+   - An offset test demanded under 1 mm where float32 gives 2.3 mm.
+   - A clock test had hand arithmetic that was 1,000 ms off.
+
+   Each expectation was re-derived and now states its derivation.
+7. **The first `publishRows` was attached to the prototype from outside the
+   class** to reach private fields. It worked, and it was a hack. It is now an
+   ordinary method.
+
+**Run it:**
+
+- `pnpm --filter @fleet/web dev`, then add `?hud=1` for the readout and
+  `?layer=baseline` to compare.
+- To measure: `pnpm --filter @fleet/web build`, then
+  `pnpm --filter @fleet/web start -p 3100`, then `pnpm smoke:web`,
+  `pnpm smoke:web "?layer=baseline"` and `pnpm smoke:web "?trucks=off"`.

@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@fleet/feed": "workspace:*",
     "@fleet/protocol": "workspace:*",
     "@fleet/routes": "workspace:*",
-    "@fleet/sim": "workspace:*"
+    "@fleet/sim": "workspace:*",
+    "@fleet/gl": "workspace:*"
   }
 }

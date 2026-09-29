@@ -97,6 +97,8 @@ export class Feed {
     lateForDisplay: 0,
   };
   private readonly tracks = new Map<number, VehicleTrack>();
+  /** Vehicles with new samples since the last `drainChanged()`. */
+  private changed = new Set<number>();
   private readonly lateness: RecentValues;
   private readonly intervals: RecentValues;
   private delay: number;
@@ -151,6 +153,7 @@ export class Feed {
       else {
         if (outcome === "reset") s.resets++;
         s.added++;
+        this.changed.add(ping.vehicleId);
         this.observe(track, ping.seq, ping.flags, frame.baseTime, displayNow);
       }
     }
@@ -176,6 +179,16 @@ export class Feed {
     if (this.lateness.size < 200 || this.intervals.size < 200) return;
     const wanted = this.lateness.quantile(0.95) + this.intervals.quantile(0.95);
     this.delay = Math.round(Math.min(this.options.maxDelayMs, Math.max(this.options.minDelayMs, wanted)));
+  }
+
+  /**
+   * The vehicles that gained samples since the last call, and resets the set.
+   * The renderer only needs to re-upload these; everything else is unchanged.
+   */
+  drainChanged(): Set<number> {
+    const changed = this.changed;
+    this.changed = new Set();
+    return changed;
   }
 
   estimate(vehicleId: number, displayTime = this.displayTime()): Estimate | undefined {

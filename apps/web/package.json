@@ -18,7 +18,8 @@
     "@fleet/protocol": "workspace:*",
     "@fleet/routes": "workspace:*",
     "@fleet/sim": "workspace:*",
-    "@fleet/transport": "workspace:*"
+    "@fleet/transport": "workspace:*",
+    "@fleet/gl": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
