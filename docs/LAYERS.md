@@ -12,8 +12,8 @@ how it's engineered and proved.
 | 2 | Route data (`packages/routes`) | Trucks must drive on the same roads the map draws, from data that never changes under a test | **Done** |
 | 3 | Seeded simulator + chaos layer (`packages/sim`) | A repeatable fleet that misbehaves on purpose, so every bug can be reproduced | **Done** |
 | 4 | The feed: ordering, clocks, smoothing (`packages/feed`) | Turns a messy feed into a clean one; the correctness core | **Done** |
-| 5 | Transport Worker + socket server | Keeps 5,000 updates a second off the main thread | Next |
-| 6 | Next.js shell + MapLibre base map | The frame everything visible sits in | |
+| 5 | Transport: Worker core, socket server, demo mode (`packages/transport`, `apps/sim-server`) | Keeps 5,000 updates a second off the main thread, and survives dropped connections | **Done** |
+| 6 | Next.js shell + MapLibre base map | The frame everything visible sits in | Next |
 | 7 | WebGL2 vehicle layer | Draws 5,000 moving trucks smoothly, in one draw call | |
 | 8 | Product UI | What a dispatcher actually uses: search, drawer, list, alerts, geofences | |
 | 9 | Replay | Answers "what happened at 14:05?" using the same renderer | |
@@ -490,3 +490,118 @@ layout for GPU upload, so it will be done there once, not twice.
 
 **Run it:** `pnpm test`, `pnpm --filter @fleet/feed evaluate`, and
 `pnpm --filter @fleet/feed bench`.
+
+---
+
+## Layer 5 · Transport: the Worker core, the socket server and demo mode
+
+**Why this layer exists**
+
+- **5,000 updates a second must never touch the main thread.** The main thread
+  paints the map and answers the dispatcher's clicks. Every socket message,
+  decode and feed update costs it time it needs for a 16 ms frame. The socket,
+  decoder and feed move into a Web Worker, and the page only receives
+  summaries.
+- **Connections drop.** Mobile networks, laptops sleeping and server restarts
+  are normal. A returning client should get exactly what it missed, or a clean
+  snapshot if it has been gone too long, never a silent hole.
+- **The demo must not depend on a server.** Free hosting sleeps. Demo mode runs
+  the simulator inside the Worker. It still goes through the same binary
+  protocol, so demo mode is a different source, not a shortcut around the real
+  path.
+- **Why now:** Layer 6's page needs a data source, and this is it. It builds
+  directly on Layer 4's order independence: a snapshot can overlap what a
+  client already has because duplicates are harmless.
+
+**What exists**
+
+| Part | What it does |
+| --- | --- |
+| `packages/transport/connection.ts` | `ReconnectingSocket`: hello with resume point, jittered backoff, silence watchdog, bad-frame counting, and resume-versus-snapshot accounting |
+| `packages/transport/sources.ts` | `SocketSource` (network mode) and `DemoSource` (simulator in the Worker, every frame through the codec) behind one interface |
+| `packages/transport/pacer.ts` | Paces a simulation to the wall clock without catch-up bursts |
+| `packages/transport/snapshot.ts` | The page's view: every truck as parallel typed arrays, transferred without copying |
+| `packages/transport/core.ts` | `FleetCore`: source → feed → a status and snapshot to the page twice a second. It takes `post` as a function, so it runs unchanged in Node tests |
+| `packages/transport/control.ts` | The one client message, `hello`, and its strict parser |
+| `apps/sim-server` | Node + `ws`: one real-time simulation broadcast to all clients, 30 s of history, latest-per-truck snapshots, `/health` and `/vehicles` over HTTP |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Resume from history, snapshot as fallback** | Exact replay when possible. When it isn't, a snapshot is safe because the feed ignores duplicates (ADR 0010) |
+| **Full-jitter backoff, reset after 10 s healthy** | Without jitter, every client dropped by the same outage retries in lockstep and hits the recovering server in waves |
+| **Silence watchdog (2 s)** | A connection can be dead without closing (sleep, a proxy swallowing the FIN). The server's steady 10 Hz, even when empty, is what makes silence meaningful |
+| **The watchdog doesn't wait for close** | It detaches handlers and moves on immediately. A browser's close handshake on a dead link can take much longer than 2 s |
+| **Backpressure: close at 1 MB queued** | A slow or frozen client would otherwise make the server buffer without limit. Closing is recoverable, because the client resumes or snapshots |
+| **Server heartbeat, `maxPayload` 1 KB, hello timeout** | Dead TCP gets terminated. A client can't send the server anything bigger than a hello, and can't hold a slot without saying one |
+| **Snapshot as typed arrays, transferred** | Moving an ArrayBuffer is constant-time. Cloning 5,000 objects is not, and the garbage would be collected on the thread that paints |
+| **Demo frames go through encode → decode** | The same code runs in both modes, so a codec bug can't hide in the demo |
+| **Pacer caps catch-up at 1 s** | A hidden tab's timers are throttled. Catching up minutes at once would freeze the Worker and flood the feed. Simulated time pauses instead |
+| **`FleetCore` takes `post` and a source** | The Worker entry is a few lines of glue. Everything it runs is testable in Node with a real socket |
+
+**How it is tested:** 22 tests, 116 across the workspace.
+
+- **Unit, with a fake socket and fake timers.**
+  - Hello, then resume from the last frame after a drop.
+  - A snapshot is counted when the server can't resume.
+  - Backoff grows exactly 999 → 1,998 → 3,996 → 7,992 → 14,985 ms at the cap
+    (random = 0.999).
+  - The backoff resets after 12 s of healthy frames.
+  - A silent connection is closed with 4000.
+  - Garbage bytes are counted and skipped.
+  - `stop()` stays stopped.
+- **Pacer.** 350 ms of wall clock gives 3 frames with the remainder carried.
+  Five minutes hidden gives one second's worth, not 3,000 frames.
+- **Demo mode.** 3 s of fake time gives 30 frames, and they are identical to the
+  same seeded simulation after wire quantisation. Encode → decode really
+  happens.
+- **Worker core.** 5 s gives 10 status and 10 snapshot posts, each snapshot
+  with 7 distinct transferable buffers.
+- **Integration, against a real server on localhost** using Node's standard
+  `WebSocket`, the same API the browser Worker uses:
+  - HTTP health and vehicle list.
+  - A new client gets a snapshot, then consecutive 10 Hz frames starting right
+    after it.
+  - No hello, or a bad hello, closes with 1008.
+  - A resume point older than history gets a snapshot.
+  - **Forced disconnects every 800 ms for 5 s: every frame arrives exactly
+    once**, with at least 4 resumes and 0 snapshots.
+  - **The worker core over a connection dropped every second reports 0 frames
+    missed.**
+  - A client that stops reading is closed as a slow consumer.
+- **The suite was mutation-checked.** Five deliberate bugs were introduced:
+  1. an off-by-one that replays one frame twice
+  2. a client that forgets its resume point
+  3. no backpressure
+  4. a watchdog not reset by frames
+  5. backoff that never resets
+
+  All five failed the suite on the first pass.
+
+**Measured** (the real server, `pnpm --filter @fleet/sim-server start` with
+5,000 trucks, one client, 10 s): **10.0 frames/s, 4,274 pings/s, 104.6 KiB/s,
+25.0 bytes per ping** including frame headers. The 20-byte header is shared
+across hundreds of pings, so the wire cost is the Layer 1 layout almost
+exactly.
+
+**Found while building**
+
+1. **The browser's close handshake is the wrong clock for a dead link.** The
+   first sketch of the watchdog called `close()` and waited for `onclose`. On a
+   link that is dead but not closed, that event can take far longer than the
+   watchdog. It now detaches and proceeds at once.
+2. **"Resume or snapshot" had to be observable.** The client couldn't tell
+   whether a reconnect lost data, so it now classifies the first frame after
+   each resume. That turns "no frames lost across drops" from a hope into an
+   assertion.
+3. **A process-management slip during measurement.** Stopping the measured
+   server with a broad `taskkill` on `node.exe` risked hitting unrelated Node
+   processes on the machine. Servers are now stopped by the process that owns
+   their port.
+
+**Run it:**
+
+- `pnpm test`
+- `pnpm --filter @fleet/sim-server start` (network mode on port 8787;
+  `VEHICLES`, `SEED` and `FORCE_DISCONNECT_MS` are configurable)
