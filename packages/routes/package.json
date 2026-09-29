@@ -1,0 +1,13 @@
+{
+  "name": "@fleet/routes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./data/lagos-routes.json": "./data/lagos-routes.json"
+  },
+  "scripts": {
+    "generate": "tsx scripts/generate.ts"
+  }
+}
