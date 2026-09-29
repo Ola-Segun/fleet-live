@@ -51,11 +51,11 @@ each one on purpose, with a seed, so every behaviour is repeatable:
 | Real-world cause | What arrives | Naive map does | This design does |
 | --- | --- | --- | --- |
 | Mobile network retries | The same ping twice | Nothing visible, or a double step | Drop duplicates by `(vehicleId, seq)` |
-| Packets take different paths | Pings out of order | Truck jumps backward | Order by device time in a per-vehicle buffer; drop a sample that is older than what's already drawn |
+| Packets take different paths | Pings out of order | Truck jumps backward | Order by the device's sequence number in a per-vehicle window. A sample that arrives behind the display time is kept and blended in, not dropped, so the track never depends on arrival timing (ADR 0010) |
 | Jitter | Pings at uneven intervals | Stutter: fast, stop, fast | **Render slightly in the past** and interpolate between known points (§4) |
 | Coverage gap (the device buffers) | Nothing, then a burst | Truck freezes, then races through the backlog | Extrapolate briefly, then mark **stale**. On the burst, skip forward instead of replaying the backlog as animation |
-| GPS noise | ±5–10 m scatter | Trucks shiver and drift off the road | Adaptive smoothing (one-euro filter): heavy when slow, light when fast. A toggle overlays the raw pings |
-| Device clock skew | Timestamps minutes off | Wrong order, wrong speed | Estimate each device's clock offset from receive times, and order by corrected device time |
+| GPS noise | ±5–10 m scatter | Trucks shiver and drift off the road | Velocity-aided smoothing using the device's own reported speed and heading (the one-euro filter first planned here was measured and lost; see ADR 0010). A toggle overlays the raw pings |
+| Device clock skew | Timestamps minutes off | Wrong order, wrong speed | Estimate each device's clock offset as the minimum delay over its window. Order never depends on the clock at all: sequence numbers carry it |
 | Socket drops | The connection closes | Blank or frozen map | Reconnect with backoff and jitter. Resume from the last sequence cursor, or take a fresh snapshot if too far behind |
 
 The discipline is the same as in any payments code that has to survive
@@ -103,8 +103,9 @@ Multiplayer games solved this problem long ago with **entity interpolation**:
 draw remote objects slightly behind real time, so there are always two known
 points to move between.
 
-- **Display time = now − D.** D adapts to the observed interval and jitter
-  (1.5 × the p95 time between pings, clamped to 1–5 s). The UI shows *"as of
+- **Display time = now − D.** D adapts to how late samples arrive and how far
+  apart they are (p95 lateness + p95 interval between pings, clamped to
+  1–5 s; built in Layer 4, measured at 1.4 s under default chaos). The UI shows *"as of
   2 s ago"*. A dispatcher is better served by smooth and honest about lag than
   by current and jumping.
 - **Interpolation happens on the GPU.** Each vehicle keeps its last 4 corrected
@@ -248,7 +249,7 @@ for everything on it.
 | Layer | What it proves | Examples |
 | --- | --- | --- |
 | **Property-based** (fast-check) | Order and duplicates don't change the answer | For any shuffling and duplication of a ping sequence, the buffer ends up identical to the sorted, deduplicated sequence. The codec round-trips any ping |
-| **Unit** (Vitest) | Pure logic is right | Bracketing and interpolation, extrapolation cap and stale transition, adaptive delay, one-euro filter, geofence hysteresis, backoff. Both precision traps shown with `Math.fround` |
+| **Unit** (Vitest) | Pure logic is right | Bracketing and interpolation, extrapolation cap and stale transition, adaptive delay, velocity-aided smoothing, geofence hysteresis, backoff. Both precision traps shown with `Math.fround` |
 | **Component** (Storybook + Vitest add-on) | UI states and interactions, with axe | Drawer (moving, idle, stale, alerting), list, alert feed, connection indicator, HUD |
 | **E2E** (Playwright, 3 viewports) | Journeys work end to end | Search, select, follow. A deep link restores camera and selection. List and map stay in sync. Kill the server → "reconnecting" → resumes without a duplicated trail. Reduced motion. Mobile sheet |
 | **Visual** | No unintended change | Vehicle layer rendered over a tile-less style with a fixed seed and Playwright's clock, so the pixels are deterministic |

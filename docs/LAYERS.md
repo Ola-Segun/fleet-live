@@ -11,8 +11,8 @@ how it's engineered and proved.
 | 1 | Workspace + wire protocol (`packages/protocol`) | Every other layer speaks it, so the contract comes first | **Done** |
 | 2 | Route data (`packages/routes`) | Trucks must drive on the same roads the map draws, from data that never changes under a test | **Done** |
 | 3 | Seeded simulator + chaos layer (`packages/sim`) | A repeatable fleet that misbehaves on purpose, so every bug can be reproduced | **Done** |
-| 4 | Ordering buffer: dedupe, reorder, clock offset, smoothing | Turns a messy feed into a clean one; the correctness core | Next |
-| 5 | Transport Worker + socket server | Keeps 5,000 updates a second off the main thread | |
+| 4 | The feed: ordering, clocks, smoothing (`packages/feed`) | Turns a messy feed into a clean one; the correctness core | **Done** |
+| 5 | Transport Worker + socket server | Keeps 5,000 updates a second off the main thread | Next |
 | 6 | Next.js shell + MapLibre base map | The frame everything visible sits in | |
 | 7 | WebGL2 vehicle layer | Draws 5,000 moving trucks smoothly, in one draw call | |
 | 8 | Product UI | What a dispatcher actually uses: search, drawer, list, alerts, geofences | |
@@ -328,3 +328,165 @@ browser Worker room for Layer 4's work in demo mode.
    (measured). The comment now says centimetres.
 
 **Run it:** `pnpm test`, and `pnpm --filter @fleet/sim bench`.
+
+---
+
+## Layer 4 · The feed: ordering, clocks and smoothing
+
+**Why this layer exists**
+
+- **It's where the project proves it can handle a messy feed.** Layer 3
+  deliberately delivers duplicates, updates out of order, bursts after coverage
+  gaps, skewed clocks and GPS noise. This layer turns that into one clean track
+  per truck. Without it, the renderer would have to reason about the network,
+  and every visual glitch would be a mix of two problems.
+- **The central guarantee is testable.** The track depends only on *which*
+  updates arrived, never on the order or how many times. That's the same
+  discipline as payment code that must survive duplicate or out-of-order
+  events, and here it's proved as a property, not asserted in a comment.
+- **Rendering in the past needs someone to choose how far.** The display delay
+  must cover both how late updates arrive and the gap between them, so there's
+  usually a known point on both sides of the display time. This layer measures
+  that and adapts.
+- **It's measured against reality.** The simulator knows where every truck
+  really was, so accuracy is a number. That number overturned the design's
+  planned filter.
+- **Why it's before the Worker and renderer:** it's pure logic with no I/O, so
+  it can be proven in isolation. Layer 5 wraps it in a Worker, and Layer 7's
+  shader must agree with its `estimate()`, which is the reference
+  implementation.
+
+**What exists**
+
+`packages/feed`:
+
+| Part | What it does |
+| --- | --- |
+| `seq.ts` | Sequence-number comparison across the uint32 wrap (RFC 1982 serial arithmetic) |
+| `track.ts` | One truck: a 16-sample window by sequence number, duplicate removal, tracker-restart detection, clock offset, lazy smoothing, and `estimate(displayTime)`, which is interpolated, extrapolated (≤5 s), holding, parked, stale or waiting |
+| `smoothing.ts` | The velocity-aided smoother (default gain 0.2) and a `raw` baseline. Smoothers are pluggable pure functions |
+| `feed.ts` | The fleet: routes frames to tracks, accounts for every ping, counts missed frames and late-for-display samples, and adapts the display delay |
+| `scripts/evaluate.ts` | Ground-truth evaluation and smoothing comparison |
+| `scripts/bench.ts` | Cost of ingest, and of ingest plus reading every truck at 10 Hz |
+| `scripts/one-euro.ts` | The design's planned filter, kept only as the measured alternative |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Order by sequence number, not time** | The device assigns sequence numbers, so a clock that steps backwards (a time-server sync, say) can't scramble a path. Tested with exactly that scenario |
+| **Duplicates keep the earliest arrival** | Found while designing the property test. The clock offset is built from arrival times, so keeping "whichever copy was processed first" would leak processing order into the result. The earliest arrival depends only on the set |
+| **Clock offset = minimum delay over the window** | The fastest delivery is the best estimate of the clock difference. Minutes of skew are corrected (tested at −3 min). It depends only on the window's contents |
+| **Backlog excluded from the clock estimate** | A coverage-gap backlog is late by design. It can never *lower* the minimum, but a window of nothing *but* backlog would otherwise report a huge offset, so that case falls back to the last good estimate |
+| **Late samples kept, not dropped** | Dropping samples that arrive behind the display time would make the track depend on arrival timing. They're kept, counted (`lateForDisplay`), and Layer 7 blends the correction |
+| **Smoothing recomputed over the window** | A stateful filter fed in arrival order would break order independence. Recomputing from the oldest sample makes smoothing a pure function of the window |
+| **Velocity-aided smoothing, not the planned one-euro filter** | Measured below. The tracker's reported speed and heading are far more precise than its position, and using them halves the error |
+| **Smoothing is lazy** | Ingest records timing only. Smoothing runs when something reads the track, so a burst of updates for one truck costs one re-smooth, not one per update |
+| **Adaptive delay = p95 lateness + p95 interval, clamped 1–5 s** | It covers both reasons a sample may not be there yet. Backlogs are excluded, or one tunnel would slow everyone's display |
+| **Stale thresholds depend on state** | Moving trucks report every second, so 10 s of silence is stale. Parked trucks report every 30 s, so stale waits 90 s. One threshold would flag every parked truck or miss real outages |
+
+**How it is tested:** 28 tests, 94 across the workspace.
+
+- **The guarantee, as a property.** 300 random feeds, each sample delivered 1–3
+  times at different moments and processed in a random order, must give a track
+  (order, corrected times, smoothed positions, and estimates at several times)
+  identical to in-order processing.
+- **The guarantee at fleet scale.** Every delivery from 2 minutes of a chaotic
+  60-truck simulation is shuffled and processed out of order, and all 60 tracks
+  must be identical to in-order processing.
+- **Hand-computed behaviour.**
+  - Interpolation halfway gives 25 m.
+  - Extrapolation for 2 s at 10 m/s gives 60 m.
+  - It holds at 90 m (the 5 s cap) and goes stale after 10 s.
+  - Parked trucks aren't projected, and go stale after 90 s.
+  - A clock 3 min slow corrects to within the fastest delivery (150 ms).
+  - Headings turn the short way round.
+- **Smoothing checked against its own mathematics.**
+  - Gain 1 equals raw.
+  - Exact velocity with clean fixes tracks exactly, with no lag.
+  - Alternating ±4 m settles at 4/9 m, the exact steady state for k = 0.2.
+- **The feed.**
+  - Every ping is accounted for (added + duplicates + too old = received).
+  - Missed frames are counted.
+  - A coverage-gap burst jumps to the newest position instead of replaying the
+    backlog.
+  - The delay settles to its floor on a clean 1 Hz feed.
+- **The suite was mutation-checked.** Six deliberate bugs were introduced, one
+  at a time:
+  1. keeping the first-processed duplicate
+  2. taking the clock offset from the newest sample
+  3. counting backlog in the clock offset
+  4. smoothing that ignores velocity
+  5. no extrapolation cap
+  6. ordering by device time
+
+  **The first pass caught four.** Two tests were then strengthened:
+  - The "ignores backlog" test couldn't fail, because backlog never lowers a
+    minimum. It now tests the all-backlog window, which is where the rule
+    matters.
+  - Ordering by device time survived because a steady clock agrees with
+    sequence order. A clock-steps-backwards test now separates them.
+
+  All six now fail the suite.
+
+**Measured against ground truth** (`pnpm --filter @fleet/feed evaluate`: 300
+trucks, 08:00 Lagos, default network chaos, 10 min). Errors are metres from
+where the truck really was at the display time:
+
+| Smoother | Moving p50 / p95 | Parked p50 / p95 |
+| --- | --- | --- |
+| Raw GPS | 4.0 / 8.7 | 4.5 / 9.3 |
+| One-euro, best balanced setting | 4.4 / 9.0 | 3.5 / 7.4 |
+| One-euro, other settings | worse on moving (lag up to 90 m) or on parked | |
+| Velocity-aided k = 0.1 | 2.0 / 4.0 | 1.8 / 4.2 |
+| **Velocity-aided k = 0.2 (default)** | **2.0 / 4.1** | **1.7 / 3.5** |
+| Velocity-aided k = 0.5 | 2.8 / 5.8 | 2.7 / 5.4 |
+
+- Moving trucks are **interpolated 96.9% of the time** under chaos (99.3% with
+  none), extrapolated 2.4%, holding or stale 0.7%.
+- The delay settled at **1.4 s** under chaos (1.1 s with none). 5,163
+  duplicates were removed and 1.9% of samples arrived late for display.
+- The parked result matches theory: σ·√(k/(2−k)) = 1.33 m per axis ≈ 1.67 m as
+  a distance; measured 1.7 m.
+- **Caveat:** the simulator's reported heading is the exact road bearing. Real
+  GPS course is noisier, especially at low speed, so real gains will be smaller
+  than this table.
+
+**Performance** (`pnpm --filter @fleet/feed bench`, i7-10610U laptop, 5 runs):
+
+| Work | Min | Median |
+| --- | --- | --- |
+| Ingest 4,311 pings/s from 5,000 trucks | 10.9 ms/s | 14.6 ms/s |
+| Ingest + read all 5,000 trucks at 10 Hz | 132 ms/s | 151 ms/s |
+| One `estimate()`, hot track / across 5,000 tracks | ~0.1 µs | ~0.45 µs |
+| Re-smoothing one changed track | ~12.5 µs | |
+
+Re-smoothing and its allocations dominate the full loop. The fix is to store
+each window in typed arrays instead of objects. Layer 7 needs exactly that
+layout for GPU upload, so it will be done there once, not twice.
+
+**Found while building**
+
+1. **The planned filter lost to measurement.** The design specified a one-euro
+   filter. At one update a second it either lags moving trucks or barely
+   smooths parked ones. Using the tracker's reported velocity halved the error.
+   Recorded in [ADR 0010](adr/0010-feed-order-independence-and-smoothing.md),
+   and the design doc was corrected.
+2. **Order independence had a hole.** Duplicates carry different arrival times,
+   and keeping the first one processed let processing order into the clock
+   estimate. It was found by writing the property down precisely, before any
+   test ran.
+3. **Two tests couldn't fail**, and the deliberate-break checks exposed both.
+   A test that can't fail looks like coverage and proves nothing.
+4. **A cold measurement misled me.** A single sweep put `estimate()` at 2.8 µs
+   and made it look like the bottleneck. A warmed micro-benchmark showed
+   ~0.1 µs hot and ~0.45 µs across 5,000 tracks. The real cost was
+   re-smoothing. Optimising the wrong thing gave 158 → 132 ms, and the
+   measurement then pointed to the right one.
+5. **Moving smoothing off the ingest path moved cost rather than removing it.**
+   Ingest fell from 80 to 11 ms/s, but the first full read then paid for the
+   deferred work. The honest benchmark measures the loop the Worker will
+   actually run, not ingest alone.
+
+**Run it:** `pnpm test`, `pnpm --filter @fleet/feed evaluate`, and
+`pnpm --filter @fleet/feed bench`.
