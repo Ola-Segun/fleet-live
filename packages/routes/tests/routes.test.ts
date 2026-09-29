@@ -163,10 +163,17 @@ describe("simplifyTimedPath", () => {
 // ─── Places and the dataset ─────────────────────────────────────────────────
 
 describe("places", () => {
-  it("pairs 25 places into 300 unique routes", () => {
+  it("pairs 25 places into 600 unique directed routes", () => {
     const ids = placePairs().map(([a, b]) => `${a.id}__${b.id}`);
     expect(PLACES).toHaveLength(25);
-    expect(new Set(ids).size).toBe(300);
+    expect(new Set(ids).size).toBe(600);
+  });
+
+  it("gives every place a way out and a way in", () => {
+    for (const place of PLACES) {
+      expect(placePairs().some(([from]) => from === place), `${place.id} out`).toBe(true);
+      expect(placePairs().some(([, to]) => to === place), `${place.id} in`).toBe(true);
+    }
   });
 });
 
@@ -222,7 +229,7 @@ describe("validateDataset", () => {
   it("parses the committed Lagos dataset through the typed entry point", () => {
     const dataset = parseDataset(committed);
     expect(dataset.places).toHaveLength(25);
-    expect(dataset.routes).toHaveLength(300);
+    expect(dataset.routes).toHaveLength(600);
   });
 
   it("refuses to parse something that isn't a dataset", () => {

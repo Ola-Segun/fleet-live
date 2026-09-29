@@ -1,5 +1,5 @@
 /**
- * Generates data/lagos-routes.json from the public OSRM demo server, once.
+ * Generates data/lagos-routes.json (600 directed routes) from the public OSRM demo server, once.
  *
  *   pnpm --filter @fleet/routes generate
  *

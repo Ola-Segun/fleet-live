@@ -14,7 +14,7 @@ export interface Place {
  * 25 places: where freight actually starts and ends in Lagos. The ports
  * (Apapa and Tin Can are notorious for truck queues), the industrial estates on
  * the Ogun border, the big markets, and the districts deliveries go to. All
- * 300 unordered pairs become routes.
+ * 600 ordered pairs become routes.
  */
 export const PLACES: readonly Place[] = [
   { id: "apapa-port", name: "Apapa Port", kind: "port", at: [6.443, 3.364] },
@@ -44,11 +44,17 @@ export const PLACES: readonly Place[] = [
   { id: "badagry", name: "Badagry", kind: "district", at: [6.42, 2.885] },
 ];
 
-/** Every unordered pair, in a fixed order, so regenerating produces the same file. */
+/**
+ * Every ordered pair, in a fixed order, so regenerating produces the same file.
+ *
+ * Ordered, not unordered: B → A is not A → B reversed, because one-way streets
+ * and slip roads differ by direction, and a truck that arrives at B must be
+ * able to leave it on a real route.
+ */
 export function placePairs(places: readonly Place[] = PLACES): [Place, Place][] {
   const pairs: [Place, Place][] = [];
-  for (let i = 0; i < places.length; i++) {
-    for (let j = i + 1; j < places.length; j++) pairs.push([places[i]!, places[j]!]);
+  for (const from of places) {
+    for (const to of places) if (from !== to) pairs.push([from, to]);
   }
   return pairs;
 }
