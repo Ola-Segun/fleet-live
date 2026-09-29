@@ -13,8 +13,8 @@ how it's engineered and proved.
 | 3 | Seeded simulator + chaos layer (`packages/sim`) | A repeatable fleet that misbehaves on purpose, so every bug can be reproduced | **Done** |
 | 4 | The feed: ordering, clocks, smoothing (`packages/feed`) | Turns a messy feed into a clean one; the correctness core | **Done** |
 | 5 | Transport: Worker core, socket server, demo mode (`packages/transport`, `apps/sim-server`) | Keeps 5,000 updates a second off the main thread, and survives dropped connections | **Done** |
-| 6 | Next.js shell + MapLibre base map | The frame everything visible sits in | Next |
-| 7 | WebGL2 vehicle layer | Draws 5,000 moving trucks smoothly, in one draw call | |
+| 6 | Next.js shell, base map, baseline truck layer (`apps/web`) | The frame everything visible sits in, and a measured baseline for Layer 7 to beat | **Done** |
+| 7 | WebGL2 vehicle layer | Draws 5,000 moving trucks smoothly, in one draw call | Next |
 | 8 | Product UI | What a dispatcher actually uses: search, drawer, list, alerts, geofences | |
 | 9 | Replay | Answers "what happened at 14:05?" using the same renderer | |
 | 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | |
@@ -605,3 +605,110 @@ exactly.
 - `pnpm test`
 - `pnpm --filter @fleet/sim-server start` (network mode on port 8787;
   `VEHICLES`, `SEED` and `FORCE_DISCONNECT_MS` are configurable)
+
+---
+
+## Layer 6 · The Next.js shell, the base map, and a baseline to beat
+
+**Why this layer exists**
+
+- **Everything visible sits inside it**: the page, the map of Lagos, and the
+  line that says whether data is flowing. Layers 1–5 were proven in Node. This
+  is the first time they run in a browser.
+- **The Worker needs a home.** Layer 5's `FleetCore` was built to run
+  unchanged in a Worker. This layer adds the few lines of glue that start it,
+  and a hook that keeps its output away from React's render cycle.
+- **Layer 7 needs a number to beat.** Before writing a custom WebGL layer, the
+  trucks are drawn the stock way (a MapLibre GeoJSON circle layer, refreshed
+  twice a second) and its cost is measured in the running app. "WebGL is
+  faster" becomes a comparison against a measured baseline, not an
+  assumption.
+
+**What exists**
+
+`apps/web`, created with `create-next-app` (Next.js 16.3, React 19, Tailwind v4,
+Turbopack):
+
+| Part | What it does |
+| --- | --- |
+| `workers/fleet.worker.ts` | Starts `FleetCore` with a demo or socket source. Demo mode loads the simulator and route file by dynamic `import()`, so network mode never downloads them. A second start while one is loading is ignored |
+| `features/live-map/use-fleet.ts` | Owns the Worker. The status report is React state; **snapshots go into a ref** and to subscribers, never into state |
+| `features/live-map/LiveMap.tsx` | MapLibre with OpenFreeMap tiles (no key), camera written to the URL on every move, and the instrumented baseline truck layer |
+| `features/live-map/StatusBar.tsx` | "Demo fleet · Live · 4,952 trucks · as of 1.4 s ago", plus reconnects and missed frames when there are any. It takes only the truck *count* from snapshots |
+| `lib/camera-url.ts`, `lib/worker-messages.ts` | URL input parsed strictly: the camera, and demo or network mode |
+| `lib/snapshot-geojson.ts`, `lib/perf.ts` | The baseline's data conversion, and timings recorded on `window.__fleetPerf` |
+| `scripts/smoke-web.mts` | Loads the built app in the installed Chrome and reports what a person would see, plus the baseline's cost |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Snapshots in a ref, not React state** | They arrive twice a second with every truck in them. As state, each one would re-render its readers. The map subscribes and updates imperatively. The status bar takes one number |
+| **The map is client-only (`next/dynamic`, `ssr: false`, inside a Client Component)** | MapLibre needs `window` and WebGL. The shell still prerenders as a static page (the build reports `/` as static). Checked against the bundled Next 16 docs |
+| **`useSearchParams` under a Suspense boundary** | Next 16 client-renders up to the nearest boundary when a component reads the URL. The boundary lets the rest prerender |
+| **No `transpilePackages`** | The bundled docs confirm Turbopack compiles workspace packages automatically. Adding the entry would be configuration without a reason |
+| **Camera written with `history.replaceState` on `moveend`** | The URL tracks the view without a navigation or a render, so a copied link reopens the same view |
+| **URL input parsed strictly** | A bad camera falls back to Lagos. A `ws` parameter must be `ws://` or `wss://` (a `javascript:` URL falls back to demo mode). Fleet size is bounded at 20,000 |
+| **Network mode never loads the simulator** | The route file is 1.3 MB. It is imported dynamically, only in demo mode |
+
+**How it is tested**
+
+- **6 unit tests** for the URL parsers and GeoJSON conversion. 122 across the
+  workspace.
+- **The production build in a real browser** (`pnpm smoke:web`, headless
+  Chrome):
+  - The status reads "Live" with 4,952 trucks, drawing 1.4 s behind real time.
+    That's the same delay the Layer 4 evaluation measured.
+  - The map fills its area.
+  - A wheel zoom writes the camera to the URL (`6.51831,3.38000,11.16`).
+  - No console errors.
+  - The screenshot shows trucks on the Lagos–Ibadan and Lagos–Abeokuta
+    corridors, the Third Mainland Bridge, Lekki and the Badagry road.
+
+**The baseline, measured** (the same page with and without the truck layer,
+two runs each):
+
+| | Long tasks in 10 s of steady state | Frames per second |
+| --- | --- | --- |
+| Stock GeoJSON truck layer, 4,953 trucks at 2 Hz | 24, 29 | 51–52 |
+| `?trucks=off` | 1, 2 | 61 |
+
+The layer's own JavaScript is small: building the GeoJSON takes 0.7 ms median
+(2.1 ms p95), and `setData` 0.1 ms. **The cost is inside MapLibre.** Each
+refresh re-tiles 5,000 points on its worker, then rebuilds and re-uploads
+buffers on the main thread, which comes to about 2.5 main-thread stalls a
+second, some over 300 ms. These numbers are from headless Chrome with
+*software* WebGL, so the absolute values are pessimistic. The comparison is
+fair because only the layer changed.
+
+**This is what Layer 7 has to beat**: a layer that uploads only changed trucks
+and interpolates on the GPU, with no re-tiling at all.
+
+**Found while building**
+
+1. **A blank map that passed "canvas exists".** The first browser run showed a
+   working status bar over an empty white page. MapLibre adds
+   `.maplibregl-map { position: relative }` to its container, which overrode
+   Tailwind's `absolute inset-0` and collapsed the container to 0 px tall. The
+   canvas existed and was clipped. The fix is a wrapper that owns the
+   positioning. The smoke test now checks that the map *fills its area*,
+   because "a canvas exists" had already passed on a broken page once.
+2. **`Omit` over a union isn't distributive.** The config type collapsed demo
+   and network modes into their shared field, so `seed` and `url` vanished.
+   The typecheck caught it. The Worker message is now built by intersection.
+3. **My instrumentation had a blind spot.** The long-task observer started
+   only after the truck layer loaded, which recorded "0 during start-up" and
+   would have recorded nothing with `?trucks=off`, making the comparison look
+   better than it was. It now starts with the map.
+4. **The install stalled for over an hour.** The first `pnpm install` stopped
+   progressing (CPU flat, memory falling). It was stopped by PID and rerun with
+   progress output and retries, and finished in 9 m 55 s. A long silent
+   install deserves a progress check within minutes, not an hour.
+
+**Run it:**
+
+- `pnpm --filter @fleet/web dev` for demo mode at localhost:3000.
+- For network mode, run `pnpm --filter @fleet/sim-server start` and open
+  `?mode=network`.
+- To measure: `pnpm --filter @fleet/web build`, then
+  `pnpm --filter @fleet/web start -p 3100`, then `pnpm smoke:web`.

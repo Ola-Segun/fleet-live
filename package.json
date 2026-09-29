@@ -7,11 +7,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc -p packages/protocol --noEmit && tsc -p packages/routes --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/feed --noEmit && tsc -p packages/transport --noEmit && tsc -p apps/sim-server --noEmit",
+    "typecheck": "tsc -p packages/protocol --noEmit && tsc -p packages/routes --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/feed --noEmit && tsc -p packages/transport --noEmit && tsc -p apps/sim-server --noEmit && pnpm --filter @fleet/web typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:web": "tsx scripts/smoke-web.mts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.4",
     "fast-check": "^4.10.2",
     "tsx": "^4.23.15",
