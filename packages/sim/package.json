@@ -1,0 +1,16 @@
+{
+  "name": "@fleet/sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@fleet/protocol": "workspace:*",
+    "@fleet/routes": "workspace:*"
+  },
+  "scripts": {
+    "bench": "tsx scripts/bench.ts"
+  }
+}

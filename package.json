@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc -p packages/protocol --noEmit && tsc -p packages/routes --noEmit",
+    "typecheck": "tsc -p packages/protocol --noEmit && tsc -p packages/routes --noEmit && tsc -p packages/sim --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },

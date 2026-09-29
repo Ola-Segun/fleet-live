@@ -26,6 +26,17 @@ importers:
 
   packages/protocol: {}
 
+  packages/routes: {}
+
+  packages/sim:
+    dependencies:
+      '@fleet/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@fleet/routes':
+        specifier: workspace:*
+        version: link:../routes
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':
