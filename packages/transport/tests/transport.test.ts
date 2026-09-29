@@ -262,6 +262,37 @@ describe("demo source and worker core", () => {
   });
 });
 
+describe("GPU rows from the worker core", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("sends only changed vehicles, gives each a permanent slot, and transfers its buffers", () => {
+    const sim = new Simulation(lagos, { seed: 6, vehicleCount: 40, startTime: T0 });
+    const posted: { message: WorkerToMain; transfer?: Transferable[] }[] = [];
+    const core = new FleetCore(new DemoSource(sim), (message, transfer) => posted.push({ message, transfer }));
+    core.start();
+    vi.advanceTimersByTime(8000);
+    core.stop();
+
+    const rows = posted.map((p) => p.message).filter((m) => m.type === "rows");
+    expect(rows.length).toBeGreaterThanOrEqual(75); // 10 Hz for 8 s, less the first tick before any frame
+    const assigned = rows.flatMap((r) => (r.type === "rows" ? r.newIds : []));
+    expect(new Set(assigned).size).toBe(assigned.length); // every vehicle assigned a slot exactly once
+    expect(rows.at(-1)!.type === "rows" && rows.at(-1)!.count).toBe(assigned.length);
+    for (const r of rows) {
+      if (r.type !== "rows") continue;
+      expect(r.data.length).toBe(r.slots.length * 36);
+      expect(r.epoch % 1000).toBe(0);
+      expect(r.epoch).toBe(rows[0]!.type === "rows" ? rows[0]!.epoch : NaN); // the epoch never moves
+    }
+    const withTransfer = posted.find((p) => p.message.type === "rows");
+    expect(withTransfer?.transfer).toHaveLength(2);
+  });
+});
+
 describe("snapshot", () => {
   it("lays out every known truck as parallel typed arrays", () => {
     const feed = new Feed();

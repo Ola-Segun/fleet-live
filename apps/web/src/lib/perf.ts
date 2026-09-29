@@ -14,8 +14,11 @@ export interface RefreshSample {
 }
 
 export interface FleetPerf {
+  /** Baseline layer only: one entry per snapshot refresh. */
   refreshes: RefreshSample[];
   longTasks: number[];
+  /** WebGL layer only: its live counters (frames, render ms, uploads, context restores). */
+  layer?: { frames: number; renderMs: number; uploads: number; contextRestores: number; layersAdded: number; skipped: number };
 }
 
 declare global {

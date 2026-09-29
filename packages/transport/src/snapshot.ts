@@ -1,15 +1,8 @@
-import type { EstimateMode, Feed } from "@fleet/feed";
+import type { Feed } from "@fleet/feed";
+import { MODE_CODES, MODES } from "@fleet/gl";
 
-/** Estimate modes as bytes, so a snapshot is a handful of typed arrays. */
-export const MODE_CODES: Record<EstimateMode, number> = {
-  waiting: 0,
-  interpolated: 1,
-  extrapolated: 2,
-  holding: 3,
-  parked: 4,
-  stale: 5,
-};
-export const MODES: readonly EstimateMode[] = ["waiting", "interpolated", "extrapolated", "holding", "parked", "stale"];
+// One numbering for estimate modes, shared by the page's snapshot and the shader.
+export { MODE_CODES, MODES };
 
 /**
  * Every truck's estimated state at one display time, as parallel typed arrays.
