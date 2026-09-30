@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import maplibregl, { type GeoJSONSource } from "maplibre-gl";
+import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
+import { slotEstimate } from "@fleet/gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { formatCamera, type Camera } from "@/lib/camera-url";
 import type { FleetGpuState } from "@/lib/gpu-state";
+import { pickNearest } from "@/lib/fleet-view";
 import { fleetPerf } from "@/lib/perf";
 import { snapshotToGeoJSON } from "@/lib/snapshot-geojson";
 import type { SnapshotListener } from "./use-fleet";
@@ -25,14 +27,53 @@ interface Props {
    * `off` (`?trucks=off`): the map alone, so each layer's cost can be measured by difference.
    */
   layer: TruckLayerKind;
+  selected: number | undefined;
+  follow: boolean;
+  /** A click on the map: the truck under it, or undefined for empty map. */
+  onPick: (id: number | undefined) => void;
+  /** The dispatcher dragged the map themselves, so following should stop. */
+  onUserMove: () => void;
+}
+
+/** Pick radius, CSS px: about a fingertip, and the WCAG 2.2 minimum target size. */
+const PICK_RADIUS = 24;
+
+/**
+ * The truck under a click, found only when someone clicks. It uses the same
+ * estimate the GPU draws (`slotEstimate` on the page's texture copy), so what
+ * you click is what you see. Trucks outside the click's box are rejected in
+ * degrees before anything is projected to the screen.
+ */
+function pickAt(map: MapLibreMap, gpu: FleetGpuState, point: { x: number; y: number }): number | undefined {
+  if (gpu.epoch === undefined || gpu.lastDisplay === undefined) return undefined;
+  const time = (gpu.lastDisplay - gpu.epoch) / 1000;
+  const a = map.unproject([point.x - PICK_RADIUS, point.y - PICK_RADIUS]);
+  const b = map.unproject([point.x + PICK_RADIUS, point.y + PICK_RADIUS]);
+  const [south, north] = [Math.min(a.lat, b.lat), Math.max(a.lat, b.lat)];
+  const [west, east] = [Math.min(a.lng, b.lng), Math.max(a.lng, b.lng)];
+  const near: { id: number; x: number; y: number }[] = [];
+  for (let slot = 0; slot < gpu.mirror.count; slot++) {
+    const e = slotEstimate(gpu.mirror.data, slot, time);
+    if (!e || !gpu.visible(e.mode)) continue;
+    if (e.lat < south || e.lat > north || e.lon < west || e.lon > east) continue;
+    const p = map.project([e.lon, e.lat]);
+    near.push({ id: gpu.slotIds[slot]!, x: p.x, y: p.y });
+  }
+  return pickNearest(near, point.x, point.y, PICK_RADIUS);
 }
 
 /**
  * The base map and the truck layer: the WebGL layer by default, or the stock
  * GeoJSON baseline it replaced, kept so the two can be compared on the same page.
  */
-export default function LiveMap({ initialCamera, subscribe, gpu, layer }: Props) {
+export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected, follow, onPick, onUserMove }: Props) {
   const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  // Latest callbacks in refs, so the map is created once and never re-created by a re-render.
+  const handlers = useRef({ onPick, onUserMove });
+  useEffect(() => {
+    handlers.current = { onPick, onUserMove };
+  });
 
   useEffect(() => {
     if (!container.current) return;
@@ -47,12 +88,32 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer }: Props)
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
 
+    mapRef.current = map;
+
     // Keep the camera in the URL without a navigation, so a copied link reopens this view.
+    // At most once a second: follow mode moves the camera every frame, and Chrome throttles
+    // history.replaceState after about 100 calls in 10 seconds.
+    let cameraTimer: ReturnType<typeof setTimeout> | undefined;
     map.on("moveend", () => {
-      const c = map.getCenter();
-      const url = new URL(window.location.href);
-      url.searchParams.set("c", formatCamera({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
-      window.history.replaceState(window.history.state, "", url);
+      if (cameraTimer) return;
+      cameraTimer = setTimeout(() => {
+        cameraTimer = undefined;
+        const c = map.getCenter();
+        const url = new URL(window.location.href);
+        url.searchParams.set("c", formatCamera({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+        window.history.replaceState(window.history.state, "", url);
+      }, 1000);
+    });
+
+    map.on("click", (e) => {
+      const t0 = performance.now();
+      const id = pickAt(map, gpu, e.point);
+      perf.lastPickMs = performance.now() - t0;
+      handlers.current.onPick(id);
+    });
+    // A drag by a person (not by follow mode's own camera moves) hands control back to them.
+    map.on("dragstart", (e) => {
+      if (e.originalEvent) handlers.current.onUserMove();
     });
 
     let unsubscribe: (() => void) | undefined;
@@ -121,12 +182,65 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer }: Props)
     });
 
     return () => {
+      clearTimeout(cameraTimer);
       unsubscribe?.();
+      mapRef.current = null;
       map.remove();
     };
     // The initial camera is read once; after that the map owns it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribe, gpu, layer]);
+
+  // Selecting a truck from the list or search brings it into view, unless follow mode will.
+  // It runs when the *selection* changes, never when follow changes: a drag switches follow off,
+  // and flying back to the truck at that moment cancelled the drag (easeTo stops gestures) and
+  // turned its release into a click on empty map, which cleared the selection. Found in Chrome.
+  const followRef = useRef(follow);
+  useEffect(() => {
+    followRef.current = follow;
+  }, [follow]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || selected === undefined || followRef.current) return;
+    const target = gpu.where(selected);
+    if (!target) return;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    map.easeTo({ center: [target.lon, target.lat], zoom: Math.max(map.getZoom(), 14), duration: reduce ? 0 : 700 });
+  }, [selected, gpu]);
+
+  // Follow: keep the selected truck centred, every frame, exactly where the GPU draws it.
+  // Every MapLibre camera call stops gestures in progress, so re-centring while the person is
+  // zooming or dragging would cancel their gesture (the first version did: drags were cut off
+  // and their release read as a click). Follow gives way: it only re-centres when the map is
+  // still and no pointer is down. Zooming in on a followed truck works; a drag hands control
+  // back (dragstart, above).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || selected === undefined || !follow) return;
+    if (map.getZoom() < 14) map.jumpTo({ zoom: 15 });
+    // A drag isn't "moving" until the pointer has travelled a few pixels, so a re-centre in that
+    // window would still cancel it before it starts. Give way from the moment the pointer is down.
+    let pointerDown = false;
+    const canvas = map.getCanvasContainer();
+    const down = () => (pointerDown = true);
+    const up = () => (pointerDown = false);
+    canvas.addEventListener("pointerdown", down);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    let raf = 0;
+    const tick = () => {
+      const target = gpu.where(selected);
+      if (target && !pointerDown && !map.isMoving()) map.jumpTo({ center: [target.lon, target.lat] });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [selected, follow, gpu]);
 
   // MapLibre adds `.maplibregl-map { position: relative }` to its container, which
   // overrode `absolute inset-0` and collapsed it to 0 px tall: a blank map with a

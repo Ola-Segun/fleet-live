@@ -34,6 +34,9 @@ const UNIFORMS = [
   "u_movingStale",
   "u_parkedStale",
   "u_detail",
+  "u_modeMask",
+  "u_selected",
+  "u_pass",
 ] as const;
 
 /**
@@ -100,7 +103,7 @@ export class VehicleLayer implements CustomLayerInterface {
     this.createResources();
   }
 
-  onRemove(map: MapLibreMap): void {
+  onRemove(): void {
     if (this.state.onChange === this.onData) this.state.onChange = undefined;
     const gl = this.gl;
     if (gl) {
@@ -149,6 +152,7 @@ export class VehicleLayer implements CustomLayerInterface {
     const start = performance.now();
     const display = clock.now(start);
     if (display === undefined) return;
+    this.state.lastDisplay = display;
 
     g.activeTexture(g.TEXTURE0);
     g.bindTexture(g.TEXTURE_2D, this.texture ?? null);
@@ -182,12 +186,21 @@ export class VehicleLayer implements CustomLayerInterface {
     g.uniform1f(u.u_movingStale!, DEFAULT_STALENESS.movingStaleS);
     g.uniform1f(u.u_parkedStale!, DEFAULT_STALENESS.parkedStaleS);
     g.uniform1f(u.u_detail!, zoom >= 11.5 ? 1 : 0);
+    g.uniform1i(u.u_modeMask!, this.state.mask);
+    g.uniform1i(u.u_selected!, this.state.selectedSlot);
 
     g.enable(g.BLEND);
     g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA); // premultiplied alpha, as MapLibre blends
     g.disable(g.DEPTH_TEST);
     g.bindVertexArray(this.vao ?? null);
+    // Two passes so the selected truck is always on top: WebGL2 has no base-instance draw,
+    // so the second pass runs every instance and the shader culls all but one immediately.
+    g.uniform1i(u.u_pass!, 0);
     g.drawArraysInstanced(g.TRIANGLE_STRIP, 0, 4, mirror.count);
+    if (this.state.selectedSlot >= 0) {
+      g.uniform1i(u.u_pass!, 1);
+      g.drawArraysInstanced(g.TRIANGLE_STRIP, 0, 4, mirror.count);
+    }
     g.bindVertexArray(null);
 
     this.stats.frames++;

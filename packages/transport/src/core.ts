@@ -1,5 +1,6 @@
 import { Feed, type FeedStats } from "@fleet/feed";
 import { FLOATS_PER_VEHICLE, packVehicle } from "@fleet/gl";
+import type { VehicleInfo } from "@fleet/sim";
 import type { ConnectionStatus } from "./connection";
 import { buildSnapshot, snapshotTransfer, type FleetSnapshot } from "./snapshot";
 import type { FrameSource } from "./sources";
@@ -27,6 +28,8 @@ export interface RowsMessage {
 export type WorkerToMain =
   | { type: "status"; mode: FrameSource["mode"]; connection: ConnectionStatus; feed: FeedStats; delayMs: number }
   | { type: "snapshot"; snapshot: FleetSnapshot }
+  | { type: "vehicles"; vehicles: VehicleInfo[] }
+  | { type: "error"; message: string }
   | RowsMessage;
 
 export type Post = (message: WorkerToMain, transfer?: Transferable[]) => void;
@@ -59,6 +62,11 @@ export class FleetCore {
 
   start(): void {
     this.source.start((frame) => this.feed.ingest(frame));
+    // Plates and drivers, once. A failure is reported, not fatal: the map still works with ids.
+    this.source.vehicles().then(
+      (vehicles) => this.post({ type: "vehicles", vehicles }),
+      (error: unknown) => this.post({ type: "error", message: `Couldn't load vehicle details: ${(error as Error).message}` }),
+    );
     this.timer = setInterval(() => this.publish(), 1000 / this.snapshotHz);
     this.rowsTimer = setInterval(() => this.publishRows(), 1000 / this.rowsHz);
   }

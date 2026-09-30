@@ -19,6 +19,11 @@ import {
   packVehicle,
   rtcMatrix,
   texelOf,
+  fromOffset,
+  groupOf,
+  modeMask,
+  slotEstimate,
+  slotOffset,
 } from "../src";
 
 const lagos = buildNetwork(parseDataset(committed));
@@ -241,5 +246,48 @@ describe("display clock", () => {
     clock.now(0);
     clock.report(600_000, 1000, 100); // ten minutes later on the server
     expect(clock.now(100)).toBeCloseTo(599_000, 6);
+  });
+});
+
+// ─── Helpers for picking, following and filtering ───────────────────────────
+
+describe("picking and filtering helpers", () => {
+  it("slotOffset points at the same float as texelOf", () => {
+    for (const slot of [0, 1, 199, 200, 4999]) {
+      const [x, y] = texelOf(slot, 0);
+      expect(slotOffset(slot)).toBe((y * TEXTURE_WIDTH + x) * 4);
+    }
+  });
+
+  it("fromOffset inverts the packing to within a millionth of a degree", () => {
+    const places: [number, number][] = [[6.52, 3.38], [6.45, 3.36], [6.6, 3.1], [6.43, 4.01]];
+    for (const [lat, lon] of places) {
+      const [la, lo] = fromOffset(mercatorX(lon) - ORIGIN_X, mercatorY(lat) - ORIGIN_Y);
+      expect(la).toBeCloseTo(lat, 9);
+      expect(lo).toBeCloseTo(lon, 9);
+    }
+  });
+
+  it("slotEstimate reads a truck out of a mirror exactly as gpuEstimate does", () => {
+    const mirror = new SampleMirror(400);
+    const row = new Float32Array(FLOATS_PER_VEHICLE);
+    packVehicle([sample(0), sample(1), sample(2)], 1_000_000, row, 0);
+    mirror.apply(Uint32Array.from([237]), row, 238);
+    const e = slotEstimate(mirror.data, 237, 1.5)!;
+    const direct = gpuEstimate(row, 0, 1.5)!;
+    expect(e.mode).toBe(direct.mode);
+    expect([e.lat, e.lon]).toEqual(fromOffset(direct.x, direct.y));
+    expect(slotEstimate(mirror.data, 5, 1.5)).toBeUndefined(); // an empty slot
+  });
+
+  it("builds a status mask the shader can test with one bit shift", () => {
+    const mask = modeMask(["parked"]);
+    const visible = (mode: number) => ((mask >> mode) & 1) === 1;
+    expect(visible(MODE_CODES.parked)).toBe(true);
+    expect(visible(MODE_CODES.interpolated)).toBe(false);
+    expect(visible(MODE_CODES.stale)).toBe(false);
+    expect(visible(MODE_CODES.waiting)).toBe(true); // always shown
+    expect(groupOf(MODE_CODES.holding)).toBe("moving");
+    expect(groupOf(MODE_CODES.waiting)).toBeUndefined();
   });
 });
