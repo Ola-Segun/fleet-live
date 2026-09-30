@@ -33,8 +33,13 @@
   --warn: #d97706;
 }
 
+/*
+ * Dark: when the person chose it (the header button sets data-theme on <html>),
+ * or when the system is dark and they haven't chosen light. The same values
+ * twice, because CSS can't share a block between a media query and a selector.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --page: #09090b;
     --surface: #18181b;
@@ -52,6 +57,25 @@
     --live: #34d399;
     --warn: #fbbf24;
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #09090b;
+  --surface: #18181b;
+  --hover: #27272a;
+  --selected: #172554;
+  --text: #fafafa; /* 17.1:1 on surface */
+  --muted: #a1a1aa; /* 6.9:1 on surface */
+  --line: #3f3f46;
+  --control: #a1a1aa; /* 6.9:1 on surface */
+  --accent: #60a5fa; /* 6.6:1 on surface */
+  --accent-fg: #0a0a0a;
+  --chip: #fafafa;
+  --chip-fg: #18181b;
+  --danger: #f87171;
+  --live: #34d399;
+  --warn: #fbbf24;
 }
 
 @theme inline {

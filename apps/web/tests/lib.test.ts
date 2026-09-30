@@ -70,3 +70,13 @@ describe("fleet config from the URL", () => {
     expect(read("mode=network&ws=javascript:alert(1)")).toMatchObject({ mode: "demo" });
   });
 });
+
+describe("theme", () => {
+  it("follows the system until the person chooses, then keeps their choice", async () => {
+    const { resolveDark, THEME_SCRIPT, THEME_KEY } = await import("../src/lib/theme-setting");
+    expect([resolveDark(null, false), resolveDark(null, true)]).toEqual([false, true]);
+    expect([resolveDark("dark", false), resolveDark("light", true)]).toEqual([true, false]);
+    expect(resolveDark("purple", true)).toBe(true); // an unknown stored value is ignored
+    expect(THEME_SCRIPT).toContain(JSON.stringify(THEME_KEY));
+  });
+});

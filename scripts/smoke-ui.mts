@@ -157,6 +157,31 @@ const p99 = sorted[Math.floor(0.99 * sorted.length)]!;
 check("still smooth with the list and a selection live", lt.length <= 2 && p99 < 34, `${(deltas.length / 10).toFixed(0)} fps, p99 frame ${p99.toFixed(1)} ms, ${lt.length} long task(s) in 10 s${lt.length ? ` (longest ${Math.max(...lt).toFixed(0)} ms)` : ""}`);
 await page.screenshot({ path: "scripts/smoke-ui-desktop.png" });
 
+// The theme button: dark on a light system, the map along with it, kept across a reload with no flash.
+const bg = () => page.evaluate("getComputedStyle(document.body).backgroundColor") as Promise<string>;
+const themeButton = page.getByRole("button", { name: "Dark mode" });
+const lightBg = await bg();
+const layers0 = (await page.evaluate("window.__fleetPerf.layer.layersAdded")) as number;
+await themeButton.click();
+await sleep(3000);
+const darkBg = await bg();
+const layers1 = (await page.evaluate("window.__fleetPerf.layer.layersAdded")) as number;
+const framesA = (await page.evaluate("window.__fleetPerf.layer.frames")) as number;
+await sleep(1000);
+const framesB = (await page.evaluate("window.__fleetPerf.layer.frames")) as number;
+check(
+  "the Dark mode button darkens the page and the map, and the trucks keep drawing",
+  lightBg !== darkBg && darkBg === "rgb(9, 9, 11)" && (await themeButton.getAttribute("aria-pressed")) === "true" && layers1 > layers0 && framesB - framesA > 30,
+  `${lightBg} → ${darkBg}, truck layer re-added ${layers1 - layers0}×, ${framesB - framesA} frames/s after`,
+);
+await page.reload();
+const firstPaintTheme = await page.evaluate("document.documentElement.getAttribute('data-theme')");
+check("the choice survives a reload, applied before the first paint", firstPaintTheme === "dark" && (await bg()) === "rgb(9, 9, 11)", `data-theme=${firstPaintTheme}`);
+await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
+await page.getByRole("button", { name: "Dark mode" }).click();
+await sleep(500);
+check("pressing it again returns to light", (await bg()) === lightBg);
+
 // A deep link reopens a truck, following.
 const id = param(page, "v");
 const deep = await browser.newPage({ viewport: { width: 1440, height: 900 } });

@@ -11,6 +11,7 @@ import { useMediaQuery } from "@/lib/use-media-query";
 import { MODE_LABEL } from "@/lib/fleet-view";
 import { parseUi, writeUi, type UiState } from "@/lib/ui-url";
 import { setShortcutsOn, useShortcutsOn } from "@/lib/shortcuts-setting";
+import { setTheme, useDarkTheme } from "@/lib/theme-setting";
 import { configFromSearch } from "@/lib/worker-messages";
 import { AlertsPanel, type AlertAction } from "./AlertsPanel";
 import { FleetPanel } from "./FleetPanel";
@@ -67,7 +68,8 @@ export function FleetApp() {
   const hud = params.get("hud") === "1";
   // Tailwind's `md` breakpoint. Decides which layout *exists*, so there is only ever one fleet panel.
   const desktop = useMediaQuery("(min-width: 768px)", true);
-  const dark = useMediaQuery("(prefers-color-scheme: dark)", false);
+  // The system's scheme until the person picks one with the header button.
+  const dark = useDarkTheme();
   // Single-key shortcuts can be switched off (WCAG 2.1.4).
   const shortcuts = useShortcutsOn();
 
@@ -307,6 +309,15 @@ export function FleetApp() {
             className="min-h-8 rounded-md border border-control px-2 text-xs text-muted focus-visible:ring-2 focus-visible:ring-accent"
           >
             Single-key shortcuts: {shortcuts ? "on" : "off"}
+          </button>
+          <button
+            type="button"
+            aria-pressed={dark}
+            onClick={() => setTheme(dark ? "light" : "dark")}
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-control px-2 text-xs text-muted focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <span aria-hidden>{dark ? "☾" : "☀"}</span>
+            Dark mode
           </button>
         </div>
         <StatusBar status={status} error={error} subscribe={subscribe} />
