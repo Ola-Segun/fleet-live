@@ -11,9 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:web": "tsx scripts/smoke-web.mts",
-    "smoke:ui": "tsx scripts/smoke-ui.mts"
+    "smoke:ui": "tsx scripts/smoke-ui.mts",
+    "a11y": "tsx scripts/a11y.mts",
+    "a11y:contrast": "tsx scripts/contrast.mts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.4",
     "fast-check": "^4.10.2",

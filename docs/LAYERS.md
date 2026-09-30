@@ -678,9 +678,11 @@ The layer's own JavaScript is small: building the GeoJSON takes 0.7 ms median
 (2.1 ms p95), and `setData` 0.1 ms. **The cost is inside MapLibre.** Each
 refresh re-tiles 5,000 points on its worker, then rebuilds and re-uploads
 buffers on the main thread, which comes to about 2.5 main-thread stalls a
-second, some over 300 ms. These numbers are from headless Chrome with
-*software* WebGL, so the absolute values are pessimistic. The comparison is
+second, some over 300 ms. These numbers are from headless Chrome on the
+laptop's integrated GPU (Intel UHD, via ANGLE/Direct3D 11). The comparison is
 fair because only the layer changed.
+
+**Correction (30 Sep 2026):** earlier versions of this entry said these numbers came from software WebGL. They didn't. Headless Chrome on this laptop renders on the Intel UHD GPU through ANGLE/Direct3D 11 (checked by asking WebGL for its unmasked renderer). The measurements stand, and the caveat was wrong.
 
 **This is what Layer 7 has to beat**: a layer that uploads only changed trucks
 and interpolates on the GPU, with no re-tiling at all.
@@ -801,7 +803,7 @@ transport test. 138 across the workspace.
 
   All three failed the suite.
 
-**Measured** (the built app in headless Chrome with software WebGL, 4,952
+**Measured** (the built app in headless Chrome on the Intel UHD GPU, 4,952
 trucks, 10 s of steady state after start-up):
 
 | Truck layer | Long tasks | Frame interval p50 / p95 / p99 | Layer CPU per frame |
@@ -924,8 +926,9 @@ trucks, 10 s of steady state after start-up):
   own shapes: arrow, dot, ring.
 - **Targets.** The phone sheet's toggle is 48 px tall, and the pick radius is
   24 px (WCAG 2.2's minimum target size).
-- **Not yet done:** an automated axe scan and a manual NVDA pass. Both are
-  scheduled for Layer 10, where the design puts them.
+- **Automated scan: closed**, with 0 axe violations and six fixes (see "Closing
+  Layer 8a's open items"). **Manual NVDA pass: prepared, not yet run**
+  ([checklist](a11y/NVDA-CHECKLIST.md)).
 
 **How it is tested:** 154 tests across the workspace.
 
@@ -955,7 +958,7 @@ trucks, 10 s of steady state after start-up):
   - On a phone, the map spans the width, the sheet opens with one search and
     one list, and its toggle is 48 px tall.
 
-**Measured** (the built app in headless Chrome with software WebGL, with the
+**Measured** (the built app in headless Chrome on the Intel UHD GPU, with the
 list, a selection and the panel live, 10 s):
 
 | | Result |
@@ -966,9 +969,8 @@ list, a selection and the panel live, 10 s):
 | List rebuild, 4,950 trucks | **2.1–2.5 ms median** (was 13–15 ms), under 1 ms while searching |
 | Click-to-pick | 6.5–22 ms |
 
-The remaining occasional dropped frame is React re-rendering the list and panel
-twice a second. That is scheduled for a profiler pass in Layer 10 rather than
-guessed at here.
+The remaining occasional dropped frame was React re-rendering the list and
+panel twice a second. **Closed:** see "Closing Layer 8a's open items" below.
 
 **Found while building**
 
@@ -1005,3 +1007,127 @@ guessed at here.
 - `pnpm --filter @fleet/web dev`, then try `/`, arrows, Enter, `F` and `Escape`.
 - To test in Chrome: `pnpm --filter @fleet/web build`, then
   `pnpm --filter @fleet/web start -p 3100`, then `pnpm smoke:ui`.
+
+---
+
+## Closing Layer 8a's open items
+
+Layer 8a ended with two items open: an occasional dropped frame with the list
+running, and accessibility checks beyond the keyboard (an automated scan and a
+screen-reader pass). This section closes the first, and the automated part of
+the second. The screen-reader pass is prepared, not done, because it needs a
+person listening.
+
+### 1 · The dropped frames
+
+**Measured before changing anything.** `scripts/profile-frames.mts` records a
+Chrome performance trace for 10 s with the list, a selection and the detail
+panel live. It finds each dropped frame as a gap of more than 20 ms between
+consecutive animation-frame callbacks, then lists what the main thread and the
+GPU process were doing inside it.
+
+| Cause | Share | What the trace showed |
+| --- | --- | --- |
+| **Our 2 Hz UI update** | Most drops | 4–12 ms of script (React re-rendering the list and panel) plus 3–7 ms of layout and style, all in one frame |
+| MapLibre's own frames | 1–2 per 10 s | An occasional 55–65 ms animation frame with a 47–53 ms GPU stall inside ANGLE's shader-compile worker (`ANGLEPlatformImpl::RunWorkerTask`): a shader variant compiled on first use. Our layer's shaders compile once, at load |
+| Garbage collection | Rare | One 19 ms major collection in four runs |
+
+**The fix, for our part:**
+
+- **`startTransition` for snapshot updates.** React renders the refreshed list
+  and panel in slices and yields to animation frames, instead of doing it all
+  in one frame.
+- **CSS containment.** `contain: strict` on the list, and `contain: content` on
+  the side panel and detail panel. Updating 20 rows can no longer make the
+  browser re-lay-out anything outside them.
+
+**Before and after** (the same profiler, five runs each):
+
+| | Before | After |
+| --- | --- | --- |
+| Dropped frames per 10 s | 6, 10, 11, 22, 40 | **1, 1, 1, 3, 3** |
+| p99 frame | ~33 ms in 4 of 5 runs | **16.8–17.0 ms in all 5** |
+| UI check's smoothness step | p99 ~33 ms in 5 of 8 runs | **16.8–17.0 ms in 4 of 4** |
+
+The drops that remain are mostly MapLibre's first-use shader compiles. About
+one frame in 600 runs slightly over (~21 ms) from our update, now that it's
+sliced.
+
+### 2 · Accessibility
+
+**Automated, in Chrome** (`pnpm a11y`, `pnpm a11y:contrast`):
+
+| Check | Result |
+| --- | --- |
+| axe-core, WCAG 2.0/2.1/2.2 A and AA plus best practice: default desktop, desktop with a truck selected, phone with the sheet open | **0 violations** in all three (47–49 rules passing) |
+| Colour contrast that axe left undecided (21–25 elements over the map, where it couldn't read the background) | Decided by a sweep of every text element against its real painted background: **0 of 201 below AA** |
+| Non-text contrast, WCAG 1.4.11 (control borders need 3:1). axe doesn't test it | **4.83:1** for every bordered control |
+| Live regions with a filter on, over 10 s | **0 changes** (was twice a second) |
+| Moving trucks' list options that say their status in words | **23 of 23** (was 0) |
+| Keyboard (in `pnpm smoke:ui`, now 17 checks) | All pass, including focus returning to the list when the panel closes, and shortcuts that can be switched off |
+
+**What the checks found and what was fixed.** axe found none of these. Each
+came from reading the accessibility tree, measuring, or writing the manual
+checklist:
+
+1. **Moving trucks' status was sight-only.** The status icon is decorative and
+   moving rows show speed, so a screen reader heard "AGL-435ZR Abdullahi Onyeka
+   14 km/h" with no hint of moving or projected. Each row now carries its status
+   in words for assistive technology. *Found by reading the accessibility tree.*
+2. **Two live regions never stopped talking.** The header's status line
+   (counts, "as of 1.4 s ago") and the list's count were both live regions over
+   numbers that change constantly. Now only a connection change is announced,
+   and the count speaks once when the person pauses after changing the search
+   or filters. *Found by reading the tree; now checked automatically.*
+3. **The search placeholder failed contrast** at 3.40:1, where AA needs 4.5:1.
+   It's now 7.09:1. *axe skips placeholder text. Found by the contrast sweep.*
+4. **Control borders failed non-text contrast** at about 1.5:1, where 3:1 is
+   needed. They're now 4.83:1. *axe doesn't test WCAG 1.4.11.*
+5. **Single-key shortcuts broke WCAG 2.1.4, a Level A criterion.** `/` and `F`
+   collide with a screen reader's own browse-mode letters, and speech-input
+   users can trigger them by accident. There's now a header switch, "Single-key
+   shortcuts: on/off", remembered per browser, with an in-memory fallback when
+   storage is blocked. *Found while writing the NVDA checklist.*
+6. **Closing the detail panel dropped focus to the top of the page.** The
+   element that had focus disappeared with the panel. Focus now returns to the
+   list. *Also found while writing the checklist.*
+
+**Manual, not yet done:** [docs/a11y/NVDA-CHECKLIST.md](a11y/NVDA-CHECKLIST.md)
+is a 20-step pass with the expected speech for each step and a column for what
+NVDA actually said. It has to be run by a person with NVDA. It isn't marked
+done here because it hasn't been.
+
+### A correction to earlier layers
+
+Layers 6, 7 and 8a, and ADR 0001, said the browser measurements came from
+*software* WebGL (SwiftShader) and were therefore pessimistic. **That was
+wrong.** Asking WebGL for its unmasked renderer shows headless Chrome on this
+laptop renders on the **Intel UHD GPU through ANGLE/Direct3D 11**. The
+`--enable-unsafe-swiftshader` flag only permitted a software fallback; it never
+forced one. The measurements stand, and the caveat was false. It has been
+corrected where it appeared, and the flag removed from the scripts.
+
+The same investigation briefly blamed the GPU process for dropped frames,
+because its trace showed 16.7 ms events. Those were scheduler wrappers waiting
+on the frame clock. With wrappers excluded, the GPU process does 1–2 ms of work
+per frame. That reading was withdrawn before any change was made.
+
+### Found while closing
+
+1. **The first profile misled twice**: once attributing time to scheduler
+   wrappers instead of the work inside them, and once blaming the GPU for
+   frame-clock waits. Each was checked against a finer breakdown before
+   anything changed.
+2. **"Couldn't decide" isn't "passed".** axe left 21–25 contrast checks
+   undecided, and deciding them found the placeholder failure.
+3. **A test found its target by a coincidence.** The Parked-filter check
+   located "the count" by taking the first `aria-live` element. After the
+   live-region fix, that became the hidden connection announcement. It now
+   targets the visible count text.
+
+**Run it** (with the built app on port 3100):
+
+- `pnpm a11y`
+- `pnpm a11y:contrast`
+- `pnpm smoke:ui`
+- `pnpm profile:frames`

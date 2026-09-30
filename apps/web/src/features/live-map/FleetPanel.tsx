@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { ALL_GROUPS, type StatusGroup } from "@fleet/gl";
 import type { VehicleInfo } from "@fleet/sim";
 import type { FleetSnapshot } from "@fleet/transport";
@@ -41,7 +41,10 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
   const [height, setHeight] = useState(400);
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => subscribe(setSnapshot), [subscribe]);
+  // A transition, so React can render the refreshed list in slices and yield to animation
+  // frames. Rendered in one go, it landed 4–10 ms of script plus layout in a single frame,
+  // which is what the frame trace showed dropping frames (scripts/profile-frames.mts).
+  useEffect(() => subscribe((s) => startTransition(() => setSnapshot(s))), [subscribe]);
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
@@ -65,6 +68,19 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
     [order, snapshot, index],
   );
   const counts = useMemo(() => (snapshot ? countGroups(snapshot) : { moving: 0, parked: 0, stale: 0 }), [snapshot]);
+
+  // The count is announced only when the *person* changes the search or filters, once they pause.
+  // As a live region on the count itself, it spoke on every refresh that shifted the numbers:
+  // twice a second with a filter on.
+  const [countAnnouncement, setCountAnnouncement] = useState("");
+  const lengthRef = useRef(0);
+  useEffect(() => {
+    lengthRef.current = rows.length;
+  }, [rows.length]);
+  useEffect(() => {
+    const timer = setTimeout(() => setCountAnnouncement(`${number.format(lengthRef.current)} trucks shown`), 700);
+    return () => clearTimeout(timer);
+  }, [ui.query, ui.groups]);
   const activeIndex = useMemo(() => {
     if (activeId === undefined || !snapshot) return 0;
     for (let k = 0; k < order.length; k++) if (snapshot.ids[order[k]!] === activeId) return k;
@@ -117,9 +133,9 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
               listRef.current?.focus();
             }
           }}
-          placeholder="Search plate or driver  ( / )"
+          placeholder="Search plate or driver"
           autoComplete="off"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          className="w-full rounded-md border border-zinc-500 px-3 py-2 text-sm outline-none placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-blue-600"
         />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Show statuses">
           {ALL_GROUPS.map((g) => (
@@ -128,22 +144,25 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
               type="button"
               aria-pressed={ui.groups.includes(g)}
               onClick={() => toggleGroup(g)}
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs aria-pressed:border-zinc-800 aria-pressed:bg-zinc-800 aria-pressed:text-white aria-[pressed=false]:border-zinc-300 aria-[pressed=false]:text-zinc-600"
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs aria-pressed:border-zinc-800 aria-pressed:bg-zinc-800 aria-pressed:text-white aria-[pressed=false]:border-zinc-500 aria-[pressed=false]:text-zinc-600"
             >
               {GROUP_LABEL[g]} <span className="tabular-nums">{number.format(counts[g])}</span>
             </button>
           ))}
         </div>
         <div className="flex items-center justify-between text-xs text-zinc-600">
-          <span aria-live="polite">
+          <span>
             {snapshot ? `${number.format(rows.length)} of ${number.format(snapshot.count)} trucks` : "Loading trucks…"}
+          </span>
+          <span className="sr-only" aria-live="polite">
+            {countAnnouncement}
           </span>
           <label className="flex items-center gap-1">
             Sort
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className="rounded border border-zinc-300 bg-white px-1 py-0.5"
+              className="rounded border border-zinc-500 bg-white px-1 py-0.5"
             >
               <option value="status">Needs attention</option>
               <option value="plate">Plate</option>
@@ -161,7 +180,8 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
         aria-activedescendant={rows.at(activeIndex) ? `truck-${rows.at(activeIndex)!.id}` : undefined}
         onKeyDown={onListKey}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-        className="relative min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+        // Containment: updating rows can't make the browser re-lay-out anything outside the list.
+        className="relative min-h-0 flex-1 overflow-y-auto outline-none [contain:strict] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
       >
         <div style={{ height: rows.length * ROW }} className="relative">
           {/* The rows on screen, plus the keyboard-active row wherever it is. The live sort can move
@@ -195,6 +215,9 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
                 <span className="w-24 shrink-0 font-mono font-medium">{row.plate}</span>
                 <span className="min-w-0 flex-1 truncate text-zinc-600">{row.driver}</span>
                 <span className="w-24 shrink-0 text-right text-xs text-zinc-600">
+                  {/* The icon is decorative (aria-hidden) and moving rows show speed, so a screen reader
+                      needs the status in words, or "moving" and "projected" would be sight-only. */}
+                  {row.group === "moving" && <span className="sr-only">{MODE_LABEL[row.mode]}, </span>}
                   {row.group === "moving" ? `${Math.round(row.speedKmh)} km/h` : MODE_LABEL[row.mode]}
                 </span>
               </div>

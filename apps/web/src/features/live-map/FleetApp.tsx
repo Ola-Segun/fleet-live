@@ -7,6 +7,7 @@ import { DEFAULT_CAMERA, parseCamera } from "@/lib/camera-url";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { MODE_LABEL } from "@/lib/fleet-view";
 import { parseUi, writeUi, type UiState } from "@/lib/ui-url";
+import { setShortcutsOn, useShortcutsOn } from "@/lib/shortcuts-setting";
 import { configFromSearch } from "@/lib/worker-messages";
 import { FleetPanel } from "./FleetPanel";
 import type { TruckLayerKind } from "./LiveMap";
@@ -45,6 +46,8 @@ export function FleetApp() {
   const hud = params.get("hud") === "1";
   // Tailwind's `md` breakpoint. Decides which layout *exists*, so there is only ever one fleet panel.
   const desktop = useMediaQuery("(min-width: 768px)", true);
+  // Single-key shortcuts can be switched off (WCAG 2.1.4).
+  const shortcuts = useShortcutsOn();
 
   const patch = useCallback(
     (p: Partial<UiState>) =>
@@ -61,6 +64,11 @@ export function FleetApp() {
 
   const select = useCallback(
     (id: number | undefined) => {
+      // Closing the detail panel removes the element that had focus. Left alone, focus falls to the
+      // top of the page and a keyboard or screen-reader user loses their place: send it to the list.
+      if (id === undefined && document.activeElement?.closest("[aria-labelledby=drawer-title]")) {
+        requestAnimationFrame(() => document.querySelector<HTMLElement>('[role="listbox"]')?.focus());
+      }
       patch({ vehicle: id, follow: id === undefined ? false : undefined });
       if (id !== undefined) setSheetOpen(true);
     },
@@ -77,22 +85,25 @@ export function FleetApp() {
     setAnnouncement(`${plate} selected${where ? `, ${MODE_LABEL[where.mode] ?? ""}` : ""}.`);
   }, [ui.vehicle, vehicles, gpu]);
 
-  // Keyboard: "/" search, "F" follow, "Escape" clear.
+  // Keyboard: "/" search, "F" follow (both switchable off), "Escape" clear (not a character key).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isTyping(e.target)) {
+        select(undefined);
+        return;
+      }
+      if (!shortcuts) return;
       if (e.key === "/" && !isTyping(e.target)) {
         e.preventDefault();
         setSheetOpen(true);
         document.getElementById("fleet-search")?.focus();
       } else if ((e.key === "f" || e.key === "F") && !isTyping(e.target) && !e.ctrlKey && !e.metaKey) {
         setUi((u) => (u.vehicle === undefined ? u : { ...u, follow: !u.follow }));
-      } else if (e.key === "Escape" && !isTyping(e.target)) {
-        select(undefined);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [select]);
+  }, [select, shortcuts]);
 
   const panel = <FleetPanel subscribe={subscribe} vehicles={vehicles} ui={ui} onUi={patch} onSelect={select} />;
   const drawer =
@@ -116,13 +127,25 @@ export function FleetApp() {
         Skip to truck search
       </a>
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-white px-4 py-2">
-        <h1 className="text-base font-semibold">Fleet Live</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-base font-semibold">Fleet Live</h1>
+          <button
+            type="button"
+            aria-pressed={shortcuts}
+            onClick={() => setShortcutsOn(!shortcuts)}
+            className="min-h-8 rounded-md border border-zinc-500 px-2 text-xs text-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-600"
+          >
+            Single-key shortcuts: {shortcuts ? "on" : "off"}
+          </button>
+        </div>
         <StatusBar status={status} error={error} subscribe={subscribe} />
       </header>
 
       <div className="relative flex min-h-0 flex-1">
         {/* Desktop: the list beside the map. Phone: a bottom sheet over the map (below). */}
-        {desktop && <aside className="w-[22rem] shrink-0 border-r border-zinc-200 bg-white">{panel}</aside>}
+        {desktop && (
+          <aside className="w-[22rem] shrink-0 border-r border-zinc-200 bg-white [contain:content]">{panel}</aside>
+        )}
 
         <main className="relative min-w-0 flex-1">
           <LiveMap

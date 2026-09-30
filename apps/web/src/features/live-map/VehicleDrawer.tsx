@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import type { VehicleInfo } from "@fleet/sim";
 import type { FleetSnapshot } from "@fleet/transport";
 import { MODE_LABEL } from "@/lib/fleet-view";
@@ -36,7 +36,7 @@ interface Props {
 /** One truck: who's driving, what it's doing, how fresh the data is, and a follow switch. */
 export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, onClose }: Props) {
   const [snapshot, setSnapshot] = useState<FleetSnapshot | null>(null);
-  useEffect(() => subscribe(setSnapshot), [subscribe]);
+  useEffect(() => subscribe((s) => startTransition(() => setSnapshot(s))), [subscribe]);
 
   const i = snapshot ? indexOf(snapshot, vehicleId) : -1;
   const mode = i >= 0 ? snapshot!.mode[i]! : undefined;
@@ -45,7 +45,7 @@ export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, on
   const age = i >= 0 ? Math.max(0, snapshot!.ageMs[i]! / 1000) : undefined;
 
   return (
-    <section aria-labelledby="drawer-title" className="rounded-lg border border-zinc-200 bg-white p-4 shadow-lg">
+    <section aria-labelledby="drawer-title" className="rounded-lg border border-zinc-200 bg-white p-4 shadow-lg [contain:content]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="drawer-title" className="font-mono text-lg font-semibold">
@@ -87,9 +87,9 @@ export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, on
         type="button"
         aria-pressed={follow}
         onClick={() => onFollow(!follow)}
-        className="mt-4 w-full rounded-md border px-3 py-2 text-sm font-medium aria-pressed:border-blue-700 aria-pressed:bg-blue-700 aria-pressed:text-white aria-[pressed=false]:border-zinc-300 focus-visible:ring-2 focus-visible:ring-blue-600"
+        className="mt-4 w-full rounded-md border px-3 py-2 text-sm font-medium aria-pressed:border-blue-700 aria-pressed:bg-blue-700 aria-pressed:text-white aria-[pressed=false]:border-zinc-500 focus-visible:ring-2 focus-visible:ring-blue-600"
       >
-        {follow ? "Following · press F to stop" : "Follow on map  ( F )"}
+        {follow ? "Following" : "Follow on map"}
       </button>
     </section>
   );
