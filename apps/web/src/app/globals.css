@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens: every colour the UI uses, with a light and a dark value.
+ * Components use the token names (bg-surface, text-muted, border-control, …),
+ * never a fixed palette colour, so both schemes stay consistent.
+ *
+ * Why this exists: the create-next-app template only swapped the page's text
+ * colour to near-white in dark mode, while the panels had fixed white
+ * backgrounds. Any text without its own colour became near-white on white,
+ * invisible for everyone using a dark system theme. The light-mode tests
+ * couldn't see it. Both schemes are now measured (pnpm a11y, pnpm a11y:contrast).
+ *
+ * Every text pair below clears WCAG AA (4.5:1) and every control border clears
+ * WCAG 1.4.11 (3:1), in both schemes.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  color-scheme: light;
+  --page: #f4f4f5;
+  --surface: #ffffff;
+  --hover: #f4f4f5;
+  --selected: #eff6ff;
+  --text: #18181b; /* 17.7:1 on surface */
+  --muted: #52525b; /* 7.7:1 on surface */
+  --line: #e4e4e7; /* dividers only, never the sole edge of a control */
+  --control: #71717a; /* 4.8:1 on surface */
+  --accent: #1d4ed8; /* focus rings and pressed toggles: 6.7:1 on surface */
+  --accent-fg: #ffffff;
+  --chip: #27272a;
+  --chip-fg: #ffffff;
+  --danger: #b91c1c;
+  --live: #059669;
+  --warn: #d97706;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+    --page: #09090b;
+    --surface: #18181b;
+    --hover: #27272a;
+    --selected: #172554;
+    --text: #fafafa; /* 17.1:1 on surface */
+    --muted: #a1a1aa; /* 6.9:1 on surface */
+    --line: #3f3f46;
+    --control: #a1a1aa; /* 6.9:1 on surface */
+    --accent: #60a5fa; /* 6.6:1 on surface */
+    --accent-fg: #0a0a0a;
+    --chip: #fafafa;
+    --chip-fg: #18181b;
+    --danger: #f87171;
+    --live: #34d399;
+    --warn: #fbbf24;
   }
 }
 
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-control: var(--control);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-chip: var(--chip);
+  --color-chip-fg: var(--chip-fg);
+  --color-danger: var(--danger);
+  --color-live: var(--live);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--page);
+  color: var(--text);
   font-family: var(--font-sans), system-ui, sans-serif;
 }

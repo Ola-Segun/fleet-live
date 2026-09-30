@@ -14,8 +14,34 @@ import { VehicleLayer, type VehicleLayerStats } from "./vehicle-layer";
 
 export type TruckLayerKind = "gl" | "baseline" | "off";
 
-/** Free, no API key, commercial use allowed; attribution required (shown by MapLibre's control). */
-const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
+/** OpenFreeMap: free, no API key, commercial use allowed; attribution required (shown by MapLibre's control). */
+const styleUrl = (dark: boolean) => `https://tiles.openfreemap.org/styles/${dark ? "dark" : "positron"}`;
+
+/**
+ * Add the truck layer once MapLibre will accept it. MapLibre drops custom layers
+ * whenever it rebuilds the style: after a lost WebGL context, and after a style
+ * swap (the dark/light switch). `isStyleLoaded()` also waits for every tile, and
+ * `styledata` stops firing before tiles finish, so waiting on both never
+ * succeeded. Adding a layer needs only the style: try on each style and idle
+ * event until it takes.
+ */
+function ensureVehicleLayer(map: MapLibreMap, gpu: FleetGpuState, stats: VehicleLayerStats): void {
+  const attempt = () => {
+    try {
+      if (!map.getLayer("fleet-vehicles")) {
+        map.addLayer(new VehicleLayer(gpu, stats));
+        stats.layersAdded++;
+      }
+      map.off("styledata", attempt);
+      map.off("idle", attempt);
+    } catch {
+      // "Style is not done loading": wait for the next event.
+    }
+  };
+  map.on("styledata", attempt);
+  map.on("idle", attempt);
+  attempt();
+}
 
 interface Props {
   initialCamera: Camera;
@@ -33,6 +59,8 @@ interface Props {
   onPick: (id: number | undefined) => void;
   /** The dispatcher dragged the map themselves, so following should stop. */
   onUserMove: () => void;
+  /** The system's colour scheme: picks the basemap, and the selection ring's colour. */
+  dark: boolean;
 }
 
 /** Pick radius, CSS px: about a fingertip, and the WCAG 2.2 minimum target size. */
@@ -66,9 +94,11 @@ function pickAt(map: MapLibreMap, gpu: FleetGpuState, point: { x: number; y: num
  * The base map and the truck layer: the WebGL layer by default, or the stock
  * GeoJSON baseline it replaced, kept so the two can be compared on the same page.
  */
-export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected, follow, onPick, onUserMove }: Props) {
+export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected, follow, onPick, onUserMove, dark }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const statsRef = useRef<VehicleLayerStats | null>(null);
+  const darkAtCreation = useRef(dark);
   // Latest callbacks in refs, so the map is created once and never re-created by a re-render.
   const handlers = useRef({ onPick, onUserMove });
   useEffect(() => {
@@ -81,12 +111,13 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
     const perf = fleetPerf();
     const map = new maplibregl.Map({
       container: container.current,
-      style: STYLE_URL,
+      style: styleUrl(darkAtCreation.current),
       center: [initialCamera.lng, initialCamera.lat],
       zoom: initialCamera.zoom,
       attributionControl: { compact: true },
     });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
+    // Bottom-right: the truck detail panel occupies the top-right corner, and covered these controls there.
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right");
 
     mapRef.current = map;
 
@@ -122,29 +153,13 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
       if (layer === "gl") {
         const stats: VehicleLayerStats = { frames: 0, renderMs: 0, uploads: 0, contextRestores: 0, layersAdded: 1, skipped: 0 };
         perf.layer = stats;
+        statsRef.current = stats;
         map.addLayer(new VehicleLayer(gpu, stats));
         // MapLibre 5 destroys the style when the WebGL context is lost, and does not
         // restore custom layers. Once it has reloaded the style, add a fresh one.
         map.on("webglcontextrestored", () => {
           stats.contextRestores++;
-          // `isStyleLoaded()` also waits for every tile, and `styledata` stops firing
-          // before tiles finish, so waiting on both never succeeded. Adding a layer only
-          // needs the style itself: try on each style and idle event until it takes.
-          const readd = () => {
-            try {
-              if (!map.getLayer("fleet-vehicles")) {
-                map.addLayer(new VehicleLayer(gpu, stats));
-                stats.layersAdded++;
-              }
-              map.off("styledata", readd);
-              map.off("idle", readd);
-            } catch {
-              // "Style is not done loading": wait for the next event.
-            }
-          };
-          map.on("styledata", readd);
-          map.on("idle", readd);
-          readd();
+          ensureVehicleLayer(map, gpu, stats);
         });
         return;
       }
@@ -190,6 +205,17 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
     // The initial camera is read once; after that the map owns it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribe, gpu, layer]);
+
+  // The system theme changed mid-session: swap the basemap, then put the truck layer back
+  // (a style swap drops custom layers, like a lost context does).
+  useEffect(() => {
+    const map = mapRef.current;
+    gpu.setDark(dark);
+    if (!map || dark === darkAtCreation.current) return;
+    darkAtCreation.current = dark;
+    map.setStyle(styleUrl(dark), { diff: false });
+    if (layer === "gl" && statsRef.current) ensureVehicleLayer(map, gpu, statsRef.current);
+  }, [dark, gpu, layer]);
 
   // Selecting a truck from the list or search brings it into view, unless follow mode will.
   // It runs when the *selection* changes, never when follow changes: a drag switches follow off,

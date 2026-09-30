@@ -52,6 +52,12 @@ const drawerPlate = (await page.getByRole("heading", { level: 2 }).innerText()).
 const selectedId = param(page, "v");
 check("Enter selects the first match and opens its details", shown.includes(drawerPlate) && selectedId !== null, `${drawerPlate}, v=${selectedId}`);
 
+// The detail panel must not cover the map's own controls.
+const zoomIn = await page.getByRole("button", { name: "Zoom in" }).boundingBox();
+const panelBox = await page.locator("section[aria-labelledby=drawer-title]").boundingBox();
+const overlaps = !!zoomIn && !!panelBox && zoomIn.x < panelBox.x + panelBox.width && zoomIn.x + zoomIn.width > panelBox.x && zoomIn.y < panelBox.y + panelBox.height && zoomIn.y + zoomIn.height > panelBox.y;
+check("the detail panel leaves the zoom controls uncovered", !overlaps);
+
 // Follow: the camera tracks the truck, so the URL's camera changes on its own.
 await page.locator("body").click({ position: { x: 5, y: 5 } });
 await page.keyboard.press("f");

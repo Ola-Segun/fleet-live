@@ -37,6 +37,7 @@ const UNIFORMS = [
   "u_modeMask",
   "u_selected",
   "u_pass",
+  "u_dark",
 ] as const;
 
 /**
@@ -188,6 +189,7 @@ export class VehicleLayer implements CustomLayerInterface {
     g.uniform1f(u.u_detail!, zoom >= 11.5 ? 1 : 0);
     g.uniform1i(u.u_modeMask!, this.state.mask);
     g.uniform1i(u.u_selected!, this.state.selectedSlot);
+    g.uniform1f(u.u_dark!, this.state.dark ? 1 : 0);
 
     g.enable(g.BLEND);
     g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA); // premultiplied alpha, as MapLibre blends

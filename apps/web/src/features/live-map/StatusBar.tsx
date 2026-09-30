@@ -30,20 +30,20 @@ export function StatusBar({ status, error, subscribe }: Props) {
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-red-700">
+      <p role="alert" className="text-sm text-danger">
         {error}
       </p>
     );
   }
-  if (!status) return <p className="text-sm text-zinc-600">Starting the fleet…</p>;
+  if (!status) return <p className="text-sm text-muted">Starting the fleet…</p>;
 
   const { connection, feed, delayMs, mode } = status;
   const live = connection.state === "open";
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-700">
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
       <span className="font-medium">{mode === "demo" ? "Demo fleet" : "Network"}</span>
       <span className="inline-flex items-center gap-1.5">
-        <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${live ? "bg-emerald-500" : "bg-amber-500"}`} />
+        <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${live ? "bg-live" : "bg-warn"}`} />
         {STATE_LABEL[connection.state]}
       </span>
       {/* Only a change of connection state is worth interrupting a screen reader for. The counts and

@@ -117,7 +117,7 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
 
   return (
     <section aria-label="Fleet" className="flex h-full min-h-0 flex-col">
-      <div className="space-y-2 border-b border-zinc-200 p-3">
+      <div className="space-y-2 border-b border-line p-3">
         <label htmlFor="fleet-search" className="sr-only">
           Search trucks by plate or driver
         </label>
@@ -135,7 +135,7 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
           }}
           placeholder="Search plate or driver"
           autoComplete="off"
-          className="w-full rounded-md border border-zinc-500 px-3 py-2 text-sm outline-none placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-blue-600"
+          className="w-full rounded-md border border-control px-3 py-2 text-sm outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-accent"
         />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Show statuses">
           {ALL_GROUPS.map((g) => (
@@ -144,13 +144,13 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
               type="button"
               aria-pressed={ui.groups.includes(g)}
               onClick={() => toggleGroup(g)}
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs aria-pressed:border-zinc-800 aria-pressed:bg-zinc-800 aria-pressed:text-white aria-[pressed=false]:border-zinc-500 aria-[pressed=false]:text-zinc-600"
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs aria-pressed:border-chip aria-pressed:bg-chip aria-pressed:text-chip-fg aria-[pressed=false]:border-control aria-[pressed=false]:text-muted"
             >
               {GROUP_LABEL[g]} <span className="tabular-nums">{number.format(counts[g])}</span>
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-between text-xs text-zinc-600">
+        <div className="flex items-center justify-between text-xs text-muted">
           <span>
             {snapshot ? `${number.format(rows.length)} of ${number.format(snapshot.count)} trucks` : "Loading trucks…"}
           </span>
@@ -162,7 +162,7 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className="rounded border border-zinc-500 bg-white px-1 py-0.5"
+              className="rounded border border-control bg-surface px-1 py-0.5"
             >
               <option value="status">Needs attention</option>
               <option value="plate">Plate</option>
@@ -181,7 +181,7 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
         onKeyDown={onListKey}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
         // Containment: updating rows can't make the browser re-lay-out anything outside the list.
-        className="relative min-h-0 flex-1 overflow-y-auto outline-none [contain:strict] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+        className="relative min-h-0 flex-1 overflow-y-auto outline-none [contain:strict] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
       >
         <div style={{ height: rows.length * ROW }} className="relative">
           {/* The rows on screen, plus the keyboard-active row wherever it is. The live sort can move
@@ -207,14 +207,14 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
                   onSelect(row.id);
                 }}
                 style={{ top: index * ROW, height: ROW }}
-                className={`absolute inset-x-0 flex cursor-pointer items-center gap-3 border-b border-zinc-100 px-3 text-sm ${
-                  selected ? "bg-blue-50" : index === activeIndex ? "bg-zinc-100" : "hover:bg-zinc-50"
+                className={`absolute inset-x-0 flex cursor-pointer items-center gap-3 border-b border-line px-3 text-sm ${
+                  selected ? "bg-selected" : index === activeIndex ? "bg-hover" : "hover:bg-hover"
                 }`}
               >
                 <StatusIcon mode={row.mode} />
                 <span className="w-24 shrink-0 font-mono font-medium">{row.plate}</span>
-                <span className="min-w-0 flex-1 truncate text-zinc-600">{row.driver}</span>
-                <span className="w-24 shrink-0 text-right text-xs text-zinc-600">
+                <span className="min-w-0 flex-1 truncate text-muted">{row.driver}</span>
+                <span className="w-24 shrink-0 text-right text-xs text-muted">
                   {/* The icon is decorative (aria-hidden) and moving rows show speed, so a screen reader
                       needs the status in words, or "moving" and "projected" would be sight-only. */}
                   {row.group === "moving" && <span className="sr-only">{MODE_LABEL[row.mode]}, </span>}
@@ -225,7 +225,7 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
           })}
         </div>
         {snapshot && rows.length === 0 && (
-          <p className="p-4 text-sm text-zinc-600">No trucks match. Clear the search or turn a status back on.</p>
+          <p className="p-4 text-sm text-muted">No trucks match. Clear the search or turn a status back on.</p>
         )}
       </div>
     </section>

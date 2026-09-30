@@ -11,8 +11,12 @@
  */
 import { chromium } from "@playwright/test";
 const browser = await chromium.launch({ executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe", headless: true });
-for (const [label, viewport, mobile] of [["desktop", { width: 1440, height: 900 }, false], ["phone", { width: 390, height: 844 }, true]] as const) {
-  const page = await (await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile })).newPage();
+// Both colour schemes: the dark-mode bug (near-white text on white panels) got past light-only checks.
+const combos = (["light", "dark"] as const).flatMap((scheme) =>
+  ([["desktop", { width: 1440, height: 900 }, false], ["phone", { width: 390, height: 844 }, true]] as const).map(([name, viewport, mobile]) => [`${name}, ${scheme}`, viewport, mobile, scheme] as const),
+);
+for (const [label, viewport, mobile, colorScheme] of combos) {
+  const page = await (await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, colorScheme })).newPage();
   await page.goto("http://127.0.0.1:3100/");
   await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
   if (mobile) await page.getByRole("button", { name: "Show trucks" }).tap();
