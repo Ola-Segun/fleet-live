@@ -3,7 +3,8 @@
 - banner:
   - heading "Fleet Live" [level=1]
   - 'button "Single-key shortcuts: on" [pressed]'
-  - paragraph: Demo fleet Live Connection live 4,968 trucks as of 1.3 s ago
+  - button "Dark mode"
+  - paragraph: Demo fleet Live Connection live 4,949 trucks as of 1.3 s ago
 - complementary:
   - tablist "Panel":
     - tab "Trucks" [selected]
@@ -14,37 +15,38 @@
       - text: Search trucks by plate or driver
       - searchbox "Search trucks by plate or driver"
       - group "Show statuses":
-        - button "Moving 4,172" [pressed]
-        - button "Parked 792" [pressed]
-        - button "Stale 4" [pressed]
-      - text: 4,968 of 4,968 trucks 0 trucks shown Sort
+        - button "Moving 4,180" [pressed]
+        - button "Parked 769" [pressed]
+        - button "Stale 0" [pressed]
+      - text: 4,949 of 4,949 trucks 0 trucks shown Sort
       - combobox "Sort":
         - option "Needs attention" [selected]
         - option "Plate"
         - option "Speed"
       - listbox "Trucks":
-        - option "FKJ-372NQ Chukwuma Yakubu Stale"
-        - option "IKD-340UA Yusuf Bello Stale"
-        - option "KJA-625UR Aliyu Mohammed Stale"
-        - option "MUS-859HC Nnamdi Adeyemi Stale" [selected]
-        - option "KTU-988EQ Obinna Ogunleye No recent report, 30 km/h"
-        - option "AGL-355EE Sani Adeyemi Moving, projected, 31 km/h"
-        - option "AGL-436LM Tunde Olawale Moving, projected, 29 km/h"
-        - option "AGL-463VZ Chinedu Nwosu Moving, projected, 31 km/h"
-        - option "AGL-601UR Yusuf Mohammed Moving, projected, 32 km/h"
-        - option "AGL-694AW Abdullahi Adeyemi Moving, projected, 24 km/h"
-        - option "AGL-757DL Nnamdi Adebisi Moving, projected, 30 km/h"
-        - option "AGL-764VU Bola Danjuma Moving, projected, 14 km/h"
-        - option "AGL-784PC Abdullahi Eze Moving, projected, 28 km/h"
-        - option "AGL-895FN Chukwuma Mohammed Moving, projected, 31 km/h"
-        - option "APP-116FE Adebayo Danjuma Moving, projected, 15 km/h"
-        - option "APP-156DZ Aliyu Mohammed Moving, projected, 27 km/h"
-        - option "APP-322RU Abdullahi Nwosu Moving, projected, 18 km/h"
-        - option "APP-726MS Kunle Garba Moving, projected, 31 km/h"
-        - option "BDG-115SN Ifeanyi Adebisi Moving, projected, 13 km/h"
-        - option "BDG-326UB Emeka Adebisi Moving, projected, 30 km/h"
-        - option "EKY-442SZ Tunde Danjuma Moving, projected, 22 km/h"
-        - option "EKY-821XH Bola Chukwu Moving, projected, 23 km/h"
+        - option "AGL-157HW Gbenga Okafor Moving, projected, 10 km/h"
+        - option "AGL-162DH Adebayo Ogunleye Moving, projected, 8 km/h"
+        - option "AGL-355EE Sani Adeyemi Moving, projected, 7 km/h"
+        - option "AGL-598WN Kunle Adebisi Moving, projected, 10 km/h"
+        - option "AGL-729PJ Aliyu Mohammed Moving, projected, 9 km/h"
+        - option "AGL-786CA Adebayo Adebisi Moving, projected, 9 km/h"
+        - option "AGL-821ZW Musa Eze Moving, projected, 10 km/h"
+        - option "AGL-925BX Obinna Okafor Moving, projected, 10 km/h"
+        - option "APP-124JF Chinedu Adeyemi Moving, projected, 10 km/h"
+        - option "APP-246FL Adebayo Eze Moving, projected, 10 km/h"
+        - option "APP-539XR Gbenga Garba Moving, projected, 8 km/h"
+        - option "APP-685WS Ibrahim Nwankwo Moving, projected, 7 km/h"
+        - option "APP-816DF Chukwuma Nwosu Moving, projected, 10 km/h"
+        - option "APP-946QV Chinedu Nwosu Moving, projected, 8 km/h"
+        - option "BDG-112TU Adebayo Eze Moving, projected, 11 km/h"
+        - option "BDG-158PV Emeka Danjuma Moving, projected, 10 km/h"
+        - option "BDG-370RF Chinedu Ogunleye Moving, projected, 9 km/h"
+        - option "BDG-407QZ Segun Danjuma Moving, projected, 8 km/h"
+        - option "BDG-517FD Adebayo Yakubu Moving, projected, 10 km/h"
+        - option "BDG-547LZ Tunde Nwosu Moving, projected, 9 km/h"
+        - option "BDG-764YR Emeka Adeyemi Moving, projected, 10 km/h"
+        - option "BDG-859FK Tunde Olawale Moving, projected, 9 km/h"
+        - option "AGL-252EA Sani Balogun Moving, 10 km/h" [selected]
 - main:
   - region "Map of the fleet":
     - region "Map"
@@ -59,20 +61,20 @@
       - text: Data from
       - link "OpenStreetMap":
         - /url: https://www.openstreetmap.org/copyright
-  - region "MUS-859HC":
-    - heading "MUS-859HC" [level=2]
-    - paragraph: Nnamdi Adeyemi
+  - region "AGL-252EA":
+    - heading "AGL-252EA" [level=2]
+    - paragraph: Sani Balogun
     - button "Close truck details": ✕
     - term: Status
-    - definition: Stale
+    - definition: Moving
     - term: Speed
-    - definition: 24 km/h
+    - definition: 10 km/h
     - term: Heading
-    - definition: N (338°)
+    - definition: NW (337°)
     - term: Last report
-    - definition: 22 s ago
+    - definition: just now
     - button "Follow on map"
-  - button "Replay"
-  - text: The last 30 s can be replayed
-- paragraph: MUS-859HC selected, Stale.
+  - button "Replay" [disabled]
+  - text: Recording for replay…
+- paragraph: AGL-252EA selected, Moving.
 - alert
