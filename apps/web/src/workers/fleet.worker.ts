@@ -31,6 +31,9 @@ function startTimeFor(minute: number | undefined): number {
   return lagosMidnight + minute * 60_000;
 }
 
+/** Long enough for a truck to reach cruising speed from rest (55 km/h at 0.6 m/s² takes about 25 s). */
+const WARM_UP_MS = 30_000;
+
 async function demoSource(seed: string, vehicleCount: number, startMinute: number | undefined): Promise<FrameSource> {
   // Loaded only in demo mode. Network mode never downloads or parses the 1.3 MB route file.
   const [{ parseDataset }, routes, { Simulation, buildNetwork }, { DemoSource }] = await Promise.all([
@@ -40,8 +43,14 @@ async function demoSource(seed: string, vehicleCount: number, startMinute: numbe
     import("@fleet/transport"),
   ]);
   const network = buildNetwork(parseDataset(routes.default));
-  const startTime = startTimeFor(startMinute);
-  return new DemoSource(new Simulation(network, { seed, vehicleCount, startTime }));
+  // Every simulated truck starts at rest, so a fresh fleet crawled for its first 20 s or so and sped up
+  // in unison: the first thing a visitor saw. Start the day WARM_UP_MS early and simulate that stretch
+  // before going live, so the first frame is traffic already under way. It costs about 1.7 s of Worker
+  // time for 5,000 trucks (Layer 3 measured ~55 ms per simulated second), while the map loads anyway.
+  const startTime = startTimeFor(startMinute) - WARM_UP_MS;
+  const sim = new Simulation(network, { seed, vehicleCount, startTime });
+  sim.advance(WARM_UP_MS);
+  return new DemoSource(sim);
 }
 
 scope.onmessage = async (event) => {

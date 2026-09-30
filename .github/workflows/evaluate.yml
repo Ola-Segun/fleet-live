@@ -1,0 +1,42 @@
+# The measurements behind the claims in docs/LAYERS.md: each layer's
+# evaluation against the simulator's ground truth, and the benchmarks.
+# Too slow for every push (the alerts evaluation alone is about 10 minutes),
+# so weekly and on demand. The output is kept as an artifact.
+#
+# Benchmarks on a shared runner are noisier than the dev laptop's, and are
+# not comparable with the numbers in the docs. The evaluations are
+# deterministic (seeded simulator), so their numbers should match exactly.
+
+name: Evaluate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Evaluations and benchmarks
+        run: |
+          mkdir -p results
+          pnpm --filter @fleet/feed evaluate   | tee results/feed-evaluate.txt
+          pnpm --filter @fleet/alerts evaluate | tee results/alerts-evaluate.txt
+          pnpm --filter @fleet/replay evaluate | tee results/replay-evaluate.txt
+          pnpm --filter @fleet/sim bench       | tee results/sim-bench.txt
+          pnpm --filter @fleet/feed bench      | tee results/feed-bench.txt
+          pnpm --filter @fleet/alerts bench    | tee results/alerts-bench.txt
+          pnpm --filter @fleet/replay bench    | tee results/replay-bench.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-results
+          path: results/

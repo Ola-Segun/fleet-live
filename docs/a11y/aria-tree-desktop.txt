@@ -4,7 +4,7 @@
   - heading "Fleet Live" [level=1]
   - 'button "Single-key shortcuts: on" [pressed]'
   - button "Dark mode"
-  - paragraph: Demo fleet Live Connection live 4,947 trucks as of 1.3 s ago
+  - paragraph: Demo fleet Live Connection live 4,928 trucks as of 1.3 s ago
 - complementary:
   - tablist "Panel":
     - tab "Trucks" [selected]
@@ -15,37 +15,37 @@
       - text: Search trucks by plate or driver
       - searchbox "Search trucks by plate or driver"
       - group "Show statuses":
-        - button "Moving 4,175" [pressed]
-        - button "Parked 758" [pressed]
+        - button "Moving 4,143" [pressed]
+        - button "Parked 745" [pressed]
         - button "Stale 0" [pressed]
-      - text: 4,947 of 4,947 trucks 0 trucks shown Sort
+      - text: 4,928 of 4,928 trucks 0 trucks shown Sort
       - combobox "Sort":
         - option "Needs attention" [selected]
         - option "Plate"
         - option "Speed"
       - listbox "Trucks":
-        - option "AGL-114WV Obinna Ajayi Moving, projected, 3 km/h"
-        - option "AGL-131WY Emeka Ajayi Moving, projected, 3 km/h"
-        - option "AGL-252EA Sani Balogun Moving, projected, 4 km/h"
-        - option "AGL-587DS Bola Garba Moving, projected, 5 km/h"
-        - option "AGL-631EE Chinedu Olawale Moving, projected, 4 km/h"
-        - option "AGL-664RZ Femi Afolabi Moving, projected, 5 km/h"
-        - option "AGL-826SH Obinna Eze Moving, projected, 5 km/h"
-        - option "AGL-885XZ Kunle Okafor Moving, projected, 3 km/h"
-        - option "AGL-920BX Bola Eze Moving, projected, 3 km/h"
-        - option "AGL-960BT Tunde Adebisi Moving, projected, 4 km/h"
-        - option "APP-226XB Segun Okafor Moving, projected, 4 km/h"
-        - option "APP-350AE Uche Balogun Moving, projected, 3 km/h"
-        - option "APP-457DC Tunde Adeyemi Moving, projected, 4 km/h"
-        - option "APP-501QU Gbenga Danjuma Moving, projected, 4 km/h"
-        - option "APP-521PT Kunle Bello Moving, projected, 3 km/h"
-        - option "APP-611UZ Ifeanyi Ogunleye Moving, projected, 3 km/h"
-        - option "APP-724DG Tunde Adeyemi Moving, projected, 4 km/h"
-        - option "APP-774MC Musa Yakubu Moving, projected, 2 km/h"
-        - option "APP-824AL Femi Garba Moving, projected, 4 km/h"
-        - option "APP-997WH Bola Onyeka Moving, projected, 4 km/h"
-        - option "BDG-105PG Ifeanyi Bello Moving, projected, 3 km/h"
-        - option "BDG-139HA Bola Abubakar Moving, projected, 5 km/h"
+        - option "AGL-126AA Sani Olawale Moving, projected, 31 km/h"
+        - option "AGL-184WA Musa Balogun Moving, projected, 27 km/h"
+        - option "AGL-350KS Chukwuma Danjuma Moving, projected, 31 km/h"
+        - option "AGL-355EE Sani Adeyemi Moving, projected, 48 km/h"
+        - option "AGL-432UU Sani Adeyemi Moving, projected, 37 km/h"
+        - option "AGL-442ES Segun Abubakar Moving, projected, 44 km/h"
+        - option "AGL-740AB Adebayo Olawale Moving, projected, 45 km/h"
+        - option "AGL-794HR Ibrahim Danjuma Moving, projected, 24 km/h"
+        - option "AGL-942RT Yusuf Eze Moving, projected, 47 km/h"
+        - option "AGL-952JD Yusuf Olawale Moving, projected, 50 km/h"
+        - option "APP-173AL Chinedu Chukwu Moving, projected, 21 km/h"
+        - option "APP-229ZQ Obinna Chukwu Moving, projected, 46 km/h"
+        - option "APP-288XV Aliyu Danjuma Moving, projected, 7 km/h"
+        - option "APP-357BU Chukwuma Bello Moving, projected, 44 km/h"
+        - option "APP-477BH Obinna Okafor Moving, projected, 52 km/h"
+        - option "APP-501QU Gbenga Danjuma Moving, projected, 41 km/h"
+        - option "APP-533AC Segun Adeyemi Moving, projected, 49 km/h"
+        - option "APP-618NL Gbenga Danjuma Moving, projected, 45 km/h"
+        - option "APP-666PE Musa Garba Moving, projected, 31 km/h"
+        - option "APP-987EL Musa Ajayi Moving, projected, 8 km/h"
+        - option "BDG-166KU Adebayo Afolabi Moving, projected, 47 km/h"
+        - option "BDG-407QZ Segun Danjuma Moving, projected, 33 km/h"
 - main:
   - region "Map of the fleet":
     - region "Map"

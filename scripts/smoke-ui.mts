@@ -7,13 +7,11 @@
  *   pnpm --filter @fleet/web build && pnpm --filter @fleet/web start -p 3100
  *   pnpm smoke:ui
  */
-import { chromium, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { BASE_URL, READY_MS, SOFTWARE_TIMING, launchBrowser, timing } from "./browser.mts";
 
-const base = "http://127.0.0.1:3100/";
-const browser = await chromium.launch({
-  executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-  headless: true,
-});
+const base = BASE_URL;
+const browser = await launchBrowser();
 const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => results.push([name, ok, detail]);
 const errors: string[] = [];
@@ -24,8 +22,8 @@ async function ready(page: Page, url: string) {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(url);
-  await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: 40_000 });
-  await page.waitForSelector('[role="option"]', { timeout: 20_000 });
+  await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
+  await page.waitForSelector('[role="option"]', { timeout: READY_MS });
 }
 
 // ─── Desktop ────────────────────────────────────────────────────────────────
@@ -61,7 +59,14 @@ const panelBox = await page.locator("section[aria-labelledby=drawer-title]").bou
 const overlaps = !!zoomIn && !!panelBox && zoomIn.x < panelBox.x + panelBox.width && zoomIn.x + zoomIn.width > panelBox.x && zoomIn.y < panelBox.y + panelBox.height && zoomIn.y + zoomIn.height > panelBox.y;
 check("the detail panel leaves the zoom controls uncovered", !overlaps);
 
-// Follow: the camera tracks the truck, so the URL's camera changes on its own.
+// The map's attribution (required by the OpenStreetMap and OpenMapTiles licences) must stay visible.
+const attribution = await page.locator(".maplibregl-ctrl-attrib").boundingBox();
+const replayBar = await page.locator("[data-replay-bar]").boundingBox();
+const covers = (a: typeof attribution, b: typeof replayBar) => !!a && !!b && a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+check("the replay bar leaves the map's attribution uncovered", !!attribution && !covers(attribution, replayBar));
+
+// Follow: the camera stays on the truck, wherever it's drawn. It moves when the truck moves; a truck that
+// went stale (a coverage gap) stands still, and so does the camera, correctly.
 await page.locator("body").click({ position: { x: 5, y: 5 } });
 await page.keyboard.press("f");
 await sleep(1500);
@@ -70,7 +75,16 @@ const c1 = param(page, "c");
 await sleep(4000);
 const c2 = param(page, "c");
 const followedStatus = (await page.locator("section[aria-labelledby=drawer-title] dd").first().innerText()).trim();
-check("F turns on follow, and the camera moves with the truck", followOn && param(page, "f") === "1" && c1 !== c2, `${c1} → ${c2}, truck ${followedStatus}`);
+const drawn = (await page.evaluate(`window.__fleetPerf.probe(${param(page, "v")})`)) as { lat: number; lon: number } | undefined;
+const [camLat, camLng] = (c2 ?? "").split(",").map(Number) as [number, number];
+// The URL's camera is written at most once a second, so allow a second of travel (and a little more).
+const offBy = drawn ? Math.hypot((camLat - drawn.lat) * 111_195, (camLng - drawn.lon) * 111_195 * Math.cos((drawn.lat * Math.PI) / 180)) : Infinity;
+const moving = followedStatus.startsWith("Moving");
+check(
+  "F turns on follow, and the camera stays on the truck (moving with it when it moves)",
+  followOn && param(page, "f") === "1" && offBy < 50 && (!moving || c1 !== c2),
+  `camera ${offBy.toFixed(0)} m from the truck, ${c1 === c2 ? "still" : "moved"}, truck ${followedStatus}`,
+);
 await page.screenshot({ path: "scripts/smoke-ui-follow.png" });
 
 // A drag by the person hands control back.
@@ -114,7 +128,7 @@ await page.keyboard.press("f");
 await sleep(400);
 const stillOff = param(page, "f") === null;
 await page.reload();
-await page.waitForSelector('[role="option"]', { timeout: 30_000 });
+await page.waitForSelector('[role="option"]', { timeout: READY_MS });
 const persisted = (await page.getByRole("button", { name: /Single-key shortcuts/ }).innerText()).includes("off");
 check("single-key shortcuts can be switched off, and stay off after a reload", stillOff && persisted);
 await page.getByRole("button", { name: /Single-key shortcuts/ }).click(); // back on for the rest
@@ -154,7 +168,7 @@ const deltas = (await page.evaluate(`new Promise((resolve) => {
 const lt = ((await page.evaluate("window.__fleetPerf.longTasks")) as number[]).slice(lt0);
 const sorted = [...deltas].sort((a, b) => a - b);
 const p99 = sorted[Math.floor(0.99 * sorted.length)]!;
-check("still smooth with the list and a selection live", lt.length <= 2 && p99 < 34, `${(deltas.length / 10).toFixed(0)} fps, p99 frame ${p99.toFixed(1)} ms, ${lt.length} long task(s) in 10 s${lt.length ? ` (longest ${Math.max(...lt).toFixed(0)} ms)` : ""}`);
+check("still smooth with the list and a selection live", ...timing(lt.length <= 2 && p99 < 34, `${(deltas.length / 10).toFixed(0)} fps, p99 frame ${p99.toFixed(1)} ms, ${lt.length} long task(s) in 10 s${lt.length ? ` (longest ${Math.max(...lt).toFixed(0)} ms)` : ""}`));
 await page.screenshot({ path: "scripts/smoke-ui-desktop.png" });
 
 // The theme button: dark on a light system, the map along with it, kept across a reload with no flash.
@@ -171,13 +185,14 @@ await sleep(1000);
 const framesB = (await page.evaluate("window.__fleetPerf.layer.frames")) as number;
 check(
   "the Dark mode button darkens the page and the map, and the trucks keep drawing",
-  lightBg !== darkBg && darkBg === "rgb(9, 9, 11)" && (await themeButton.getAttribute("aria-pressed")) === "true" && layers1 > layers0 && framesB - framesA > 30,
+  // Drawing, not speed: any frames at all under software WebGL (about 5 fps), a steady rate on a GPU.
+  lightBg !== darkBg && darkBg === "rgb(9, 9, 11)" && (await themeButton.getAttribute("aria-pressed")) === "true" && layers1 > layers0 && framesB - framesA > (SOFTWARE_TIMING ? 0 : 30),
   `${lightBg} → ${darkBg}, truck layer re-added ${layers1 - layers0}×, ${framesB - framesA} frames/s after`,
 );
 await page.reload();
 const firstPaintTheme = await page.evaluate("document.documentElement.getAttribute('data-theme')");
 check("the choice survives a reload, applied before the first paint", firstPaintTheme === "dark" && (await bg()) === "rgb(9, 9, 11)", `data-theme=${firstPaintTheme}`);
-await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
+await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: READY_MS });
 await page.getByRole("button", { name: "Dark mode" }).click();
 await sleep(500);
 check("pressing it again returns to light", (await bg()) === lightBg);
@@ -189,12 +204,14 @@ await ready(deep, `${base}?v=${id}&f=1`);
 await deep.getByRole("heading", { level: 2 }).waitFor({ timeout: 10_000 });
 check("a deep link reopens the truck and follows it", (await deep.getByRole("button", { name: /Following/ }).count()) === 1, `?v=${id}&f=1`);
 await deep.close();
+// Each open page runs its own 5,000-truck fleet; under software WebGL two at once starve the next.
+await page.close();
 
 // ─── Phone ──────────────────────────────────────────────────────────────────
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 phone.on("pageerror", (e) => errors.push(String(e)));
 await phone.goto(base);
-await phone.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
+await phone.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: READY_MS });
 const mapBox = await phone.locator(".maplibregl-map").boundingBox();
 check("phone: the map fills the width", mapBox !== null && mapBox.width >= 389);
 await phone.getByRole("button", { name: /^Show trucks/ }).tap();

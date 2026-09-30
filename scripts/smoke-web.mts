@@ -12,14 +12,11 @@
  * checked via WEBGL_debug_renderer_info). The comparison is fair because only
  * the layer changes.
  */
-import { chromium } from "@playwright/test";
+import { BASE_URL, READY_MS, launchBrowser, timing } from "./browser.mts";
 
 const query = process.argv[2] ?? "";
-const base = "http://127.0.0.1:3100/";
-const browser = await chromium.launch({
-  executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-  headless: true,
-});
+const base = BASE_URL;
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors: string[] = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -39,10 +36,10 @@ const q = (xs: number[], p: number) => {
 };
 
 await page.goto(base + query);
-await page.getByText("Live").waitFor({ timeout: 30_000 });
+await page.getByText("Live").waitFor({ timeout: READY_MS });
 await page.waitForTimeout(5000); // start-up: style, fonts, first tiles
 // "Live" appears before the map has loaded. For the WebGL layer, wait until it is actually drawing.
-if (!query) await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: 30_000 });
+if (!query) await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
 const longTasksAtStart = (await perf())?.longTasks.length ?? 0;
 
 // Sample the WebGL layer's per-frame CPU time while measuring frame intervals.
@@ -87,10 +84,22 @@ if (renderMs.length) console.log(`WebGL layer CPU per frame: p50 ${q(renderMs, 0
 console.log(`WebGL context lost and restored: ${contextCheck}`);
 console.log(`console errors: ${errors.length ? errors.join(" | ") : "none"}`);
 
+const fills = !!mapBox && !!mainBox && mapBox.height >= mainBox.height - 1;
+const restored = contextCheck.startsWith("skipped") || contextCheck.includes("drawing again: yes");
+const [smooth, smoothDetail] = timing(q(deltas, 0.99) < 34 && steady.length <= 2, `p99 ${q(deltas, 0.99).toFixed(1)} ms, ${steady.length} long task(s)`);
+const failures = [
+  ...(fills ? [] : ["the map doesn't fill its area"]),
+  ...(restored ? [] : ["drawing didn't resume after a lost WebGL context"]),
+  ...(errors.length ? ["console errors"] : []),
+  ...(smooth ? [] : [`not smooth (${smoothDetail})`]),
+];
+console.log(failures.length ? `\nFAILED: ${failures.join("; ")}` : `\npassed (${smoothDetail})`);
+if (failures.length) process.exitCode = 1;
+
 if (!query) {
   // A close-up where the shapes are visible: Apapa, the port approach.
   await page.goto(`${base}?c=6.44800,3.36000,14.50&hud=1`);
-  await page.getByText("Live").waitFor({ timeout: 30_000 });
+  await page.getByText("Live").waitFor({ timeout: READY_MS });
   await page.waitForTimeout(6000);
   await page.screenshot({ path: "scripts/smoke-web-zoom.png" });
 }
