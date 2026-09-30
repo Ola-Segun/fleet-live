@@ -10,13 +10,11 @@
  *   pnpm --filter @fleet/web build && pnpm --filter @fleet/web start -p 3100
  *   pnpm smoke:alerts
  */
-import { chromium, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 
-const base = "http://127.0.0.1:3100/?at=2230";
-const browser = await chromium.launch({
-  executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-  headless: true,
-});
+const base = `${BASE_URL}?at=2230`;
+const browser = await launchBrowser();
 const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => results.push([name, ok, detail]);
 const errors: string[] = [];
@@ -33,15 +31,19 @@ await page.addInitScript(() => {
   }
 });
 await page.goto(base);
-await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: 40_000 });
+await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
 
-// Every announcement made, in order: the live region is watched from the start.
+// Every announcement made, in order, with its time. A region counts only when *its own* text changes:
+// the first recorder re-read every live region on any change, so two regions alternating re-recorded
+// the same alert sentence moments later, which looked like announcements 0.1 s apart.
 await page.evaluate(`(() => {
   window.__spoken = [];
+  const last = new WeakMap();
   const observer = new MutationObserver(() => {
     for (const el of document.querySelectorAll("[aria-live]")) {
       const text = el.textContent?.trim();
-      if (text && window.__spoken.at(-1) !== text) window.__spoken.push(text);
+      if (text && last.get(el) !== text) window.__spoken.push({ text, at: performance.now() });
+      last.set(el, text);
     }
   });
   observer.observe(document.body, { childList: true, characterData: true, subtree: true });
@@ -93,7 +95,7 @@ await page.getByRole("button", { name: "Delete Imported yard" }).click();
 
 // ─── Alerts ─────────────────────────────────────────────────────────────────
 const alertsTab = page.getByRole("tab", { name: /Alerts/ });
-await page.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: 120_000 }).catch(() => {});
+await page.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: EVENT_MS }).catch(() => {});
 const badge = (await alertsTab.innerText()).replace(/\s+/g, " ");
 check("new alerts show as a count on the Alerts tab", /Alerts \d+/.test(badge), badge);
 await alertsTab.click();
@@ -134,9 +136,21 @@ const focus = (await page.evaluate("document.activeElement?.textContent?.trim() 
 check("resolving removes the alert", !texts.includes(resolvedText) || (await items.count()) < before, `${before} → ${await items.count()}`);
 check("after resolving, focus moves to the next alert (or the summary)", /Show truck|open|No open alerts/.test(focus), `focus on "${focus.slice(0, 40)}"`);
 
-const spoken = (await page.evaluate("window.__spoken")) as string[];
-const alertsSpoken = spoken.filter((s) => /^Alert:|new alerts\./.test(s));
-check("new alerts are announced, gathered into a few sentences", alertsSpoken.length > 0 && alertsSpoken.length <= 40, `${alertsSpoken.length}: "${alertsSpoken[0] ?? ""}"`);
+// Listen for 25 s: alerts keep arriving, so announcements must keep coming, gathered, never closer than 5 s.
+// (The first version of the announcer went silent after its first sentence; a short run can't tell.)
+const listenFrom = (await page.evaluate("performance.now()")) as number;
+await sleep(25_000);
+const spoken = (await page.evaluate("window.__spoken")) as { text: string; at: number }[];
+const alertsSpoken = spoken.filter((s) => /^Alert:|new alerts\./.test(s.text));
+// The rule: at most one alert announcement every 5 s, however many alerts land. Checked as the gaps
+// between them, so it holds however long the run takes (a fixed maximum count failed under software WebGL).
+const gaps = alertsSpoken.slice(1).map((s, i) => s.at - alertsSpoken[i]!.at);
+const shortest = gaps.length ? Math.min(...gaps) : Infinity;
+check(
+  "new alerts keep being announced, gathered, at most once every 5 s",
+  alertsSpoken.filter((s) => s.at >= listenFrom).length >= 2 && shortest >= 4900,
+  `${alertsSpoken.filter((s) => s.at >= listenFrom).length} in the last 25 s, ${alertsSpoken.length} in all, shortest gap ${Number.isFinite(shortest) ? (shortest / 1000).toFixed(1) + " s" : "n/a"}: "${alertsSpoken[0]?.text ?? ""}"`,
+);
 
 await page.screenshot({ path: "scripts/smoke-alerts.png" });
 await browser.close();

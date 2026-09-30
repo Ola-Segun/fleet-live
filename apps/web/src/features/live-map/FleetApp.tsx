@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Alert } from "@fleet/alerts";
 import { announcement as alertAnnouncement, lagosTime, type AlertNames } from "@/lib/alert-text";
+import { Gather } from "@/lib/gather";
 import { useZones } from "@/lib/zones";
 import { DEFAULT_CAMERA, parseCamera } from "@/lib/camera-url";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -130,27 +131,20 @@ export function FleetApp() {
 
   // New alerts are announced politely, gathered so a burst is one sentence, never more than one
   // every 5 s: a screen reader reading every alert as it lands would talk over everything else.
-  const queued = useRef<Alert[]>([]);
-  const lastSpoken = useRef(0);
   const namesRef = useRef(names);
   useEffect(() => {
     namesRef.current = names;
   }, [names]);
+  const gather = useRef<Gather<Alert> | null>(null);
+  useEffect(() => {
+    const g = new Gather<Alert>(ANNOUNCE_EVERY_MS, (items) => setAnnouncement(alertAnnouncement(items, namesRef.current)));
+    gather.current = g;
+    return () => g.dispose();
+  }, []);
   useEffect(() => {
     if (!alertsMessage || alertsMessage.raised.length === 0) return;
     const byId = new Map(alertsMessage.alerts.map((a) => [a.id, a]));
-    for (const id of alertsMessage.raised) {
-      const a = byId.get(id);
-      if (a) queued.current.push(a);
-    }
-    const wait = Math.max(0, lastSpoken.current + ANNOUNCE_EVERY_MS - Date.now());
-    const timer = setTimeout(() => {
-      if (queued.current.length === 0) return;
-      setAnnouncement(alertAnnouncement(queued.current, namesRef.current));
-      queued.current = [];
-      lastSpoken.current = Date.now();
-    }, wait);
-    return () => clearTimeout(timer);
+    gather.current?.push(alertsMessage.raised.flatMap((id) => byId.get(id) ?? []));
   }, [alertsMessage]);
 
   const changeReplay = useCallback(
@@ -349,8 +343,10 @@ export function FleetApp() {
             focusZone={focusZone}
           />
           {desktop && drawer && <div className="absolute right-3 top-3 z-10 w-80">{drawer}</div>}
-          {/* Desktop: along the bottom, clear of the zoom controls. Phone: along the top, clear of the sheet. */}
-          <div className={`absolute z-10 ${desktop ? "bottom-3 left-3 right-16 max-w-3xl" : "inset-x-3 top-3"}`}>
+          {/* Desktop: along the bottom, above the map's attribution line (the data licences require it be
+              visible; the README screenshot showed the bar covering it) and clear of the zoom controls.
+              Phone: along the top, clear of the sheet. */}
+          <div className={`absolute z-10 ${desktop ? "bottom-10 left-3 right-16 max-w-3xl" : "inset-x-3 top-3"}`}>
             <ReplayBar history={history} replay={replay} onChange={changeReplay} onLive={() => goLive()} />
           </div>
           {hud && <PerfHud gpu={gpu} />}

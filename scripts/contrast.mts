@@ -9,7 +9,7 @@
  *
  *   pnpm a11y:contrast   (with the built app on port 3100)
  */
-import { chromium } from "@playwright/test";
+import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 
 const MEASURE = `(() => {
     const cv = document.createElement("canvas"); cv.width = cv.height = 1; const cx = cv.getContext("2d", { willReadFrequently: true });
@@ -46,15 +46,15 @@ const MEASURE = `(() => {
     return out;
   })()`;
 
-const browser = await chromium.launch({ executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe", headless: true });
+const browser = await launchBrowser();
 // Both colour schemes: the dark-mode bug (near-white text on white panels) got past light-only checks.
 const combos = (["light", "dark"] as const).flatMap((scheme) =>
   ([["desktop", { width: 1440, height: 900 }, false], ["phone", { width: 390, height: 844 }, true]] as const).map(([name, viewport, mobile]) => [`${name}, ${scheme}`, viewport, mobile, scheme] as const),
 );
 for (const [label, viewport, mobile, colorScheme] of combos) {
   const page = await (await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, colorScheme })).newPage();
-  await page.goto("http://127.0.0.1:3100/?at=2230");
-  await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
+  await page.goto(`${BASE_URL}?at=2230`);
+  await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: READY_MS });
   if (mobile) await page.getByRole("button", { name: /^Show trucks/ }).tap();
   await page.waitForSelector('[role="option"]');
   await page.locator('[role="option"]').nth(2).click();
@@ -63,18 +63,19 @@ for (const [label, viewport, mobile, colorScheme] of combos) {
   // Each tab of the panel in turn. The demo runs from 22:30 (?at=2230) so the Alerts tab has alerts to measure.
   for (const tab of ["Trucks", "Alerts", "Zones"]) {
     if (tab !== "Trucks") {
-      if (tab === "Alerts") await page.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: 120_000 });
+      if (tab === "Alerts") await page.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: EVENT_MS });
       await page.getByRole("tab", { name: new RegExp(`^${tab}`) }).click();
       await page.waitForTimeout(500);
     }
     rows.push(...((await page.evaluate(MEASURE)) as typeof rows).map((r) => ({ ...r, text: `${tab}: ${r.text}` })));
   }
   // Replaying: the replay bar's controls and the status line's replay badge.
-  await page.waitForFunction(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Replay" && !b.disabled)`, undefined, { timeout: 120_000 });
+  await page.waitForFunction(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Replay" && !b.disabled)`, undefined, { timeout: EVENT_MS });
   await page.getByRole("button", { name: "Replay", exact: true }).click();
   await page.waitForTimeout(800);
   rows.push(...((await page.evaluate(MEASURE)) as typeof rows).map((r) => ({ ...r, text: `Replay: ${r.text}` })));
   const failing = rows.filter((r) => r.ratio < r.need);
+  if (failing.length) process.exitCode = 1;
   const byColour = new Map<string, { ratio: number; need: number; text: string; n: number }>();
   for (const r of rows) { const k = `${r.color}|${r.need}`; const e = byColour.get(k); if (!e || r.ratio < e.ratio) byColour.set(k, { ...r, n: (e?.n ?? 0) + 1 }); else e.n++; }
   console.log(`\n${label}: ${rows.length} text elements checked, ${failing.length} below the WCAG AA ratio`);

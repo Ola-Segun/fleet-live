@@ -10,15 +10,13 @@
  *   pnpm a11y
  */
 import AxeBuilder from "@axe-core/playwright";
-import { chromium, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 import { mkdirSync, writeFileSync } from "node:fs";
 
-const base = "http://127.0.0.1:3100/";
+const base = BASE_URL;
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
-const browser = await chromium.launch({
-  executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-  headless: true,
-});
+const browser = await launchBrowser();
 mkdirSync("docs/a11y", { recursive: true });
 
 let failed = false;
@@ -35,8 +33,8 @@ async function scan(page: Page, state: string) {
 
 async function ready(page: Page, url: string) {
   await page.goto(url);
-  await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
-  await page.waitForSelector('[role="option"]', { timeout: 20_000 }).catch(() => {});
+  await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: READY_MS });
+  await page.waitForSelector('[role="option"]', { timeout: READY_MS }).catch(() => {});
 }
 
 // axe needs pages from an explicit context, not browser.newPage().
@@ -100,7 +98,7 @@ await darkPhone.context().close();
 for (const scheme of ["light", "dark"] as const) {
   const p = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme })).newPage();
   await ready(p, `${base}?at=2230`);
-  await p.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: 120_000 });
+  await p.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: EVENT_MS });
   await p.getByRole("tab", { name: /^Alerts/ }).click();
   await p.getByRole("list", { name: "Open alerts" }).waitFor();
   await scan(p, `desktop, ${scheme}, Alerts tab with alerts`);
@@ -110,7 +108,7 @@ for (const scheme of ["light", "dark"] as const) {
   await scan(p, `desktop, ${scheme}, Zones tab while drawing`);
   // Layer 9: replaying, with the replay bar's controls.
   await p.getByRole("button", { name: "Cancel" }).click();
-  await p.waitForFunction(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Replay" && !b.disabled)`, undefined, { timeout: 120_000 });
+  await p.waitForFunction(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Replay" && !b.disabled)`, undefined, { timeout: EVENT_MS });
   await p.getByRole("button", { name: "Replay", exact: true }).click();
   await p.getByRole("slider", { name: "Replay time" }).waitFor();
   await scan(p, `desktop, ${scheme}, replaying`);

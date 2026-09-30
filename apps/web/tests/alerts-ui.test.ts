@@ -50,3 +50,27 @@ describe("stored zones", () => {
     expect(ids[1]).not.toBe("same");
   });
 });
+
+describe("gathering announcements", () => {
+  it("speaks the first batch at once, then at most every 5 s, however often alerts arrive", async () => {
+    const { vi } = await import("vitest");
+    const { Gather } = await import("../src/lib/gather");
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const spoken: { at: number; n: number }[] = [];
+    const g = new Gather<number>(5000, (items) => spoken.push({ at: Date.now(), n: items.length }));
+    // An alert every 500 ms for 20 s: the rate the Worker's messages arrive at.
+    for (let t = 0; t < 20_000; t += 500) {
+      g.push([t]);
+      vi.advanceTimersByTime(500);
+    }
+    vi.advanceTimersByTime(5000);
+    expect(spoken.map((s) => s.at)).toEqual([0, 5000, 10_000, 15_000, 20_000]);
+    expect(spoken.reduce((sum, s) => sum + s.n, 0)).toBe(40); // nothing lost, nothing twice
+    g.push([]); // nothing new: nothing said
+    vi.advanceTimersByTime(10_000);
+    expect(spoken).toHaveLength(5);
+    g.dispose();
+    vi.useRealTimers();
+  });
+});

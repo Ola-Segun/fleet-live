@@ -7,16 +7,13 @@
  *   pnpm --filter @fleet/web build && pnpm --filter @fleet/web start -p 3100
  *   pnpm profile:frames [query]
  */
-import { chromium } from "@playwright/test";
+import { BASE_URL, READY_MS, launchBrowser } from "./browser.mts";
 
 const query = process.argv[2] ?? "";
-const browser = await chromium.launch({
-  executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-  headless: true,
-});
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto("http://127.0.0.1:3100/" + query);
-await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: 40_000 });
+await page.goto(BASE_URL + query);
+await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
 await page.waitForSelector('[role="option"]');
 await page.locator('[role="option"]').nth(3).click(); // a selection and the detail panel, as in the UI check
 await page.waitForTimeout(3000);
@@ -33,7 +30,8 @@ interface TraceEvent {
 }
 const client = await page.context().newCDPSession(page);
 const events: TraceEvent[] = [];
-client.on("Tracing.dataCollected", (e: { value: TraceEvent[] }) => events.push(...e.value));
+// The protocol types trace events loosely ({ [key]: string }); they are TraceEvent-shaped in practice.
+client.on("Tracing.dataCollected", (e) => events.push(...(e.value as unknown as TraceEvent[])));
 const done = new Promise<void>((resolve) => client.once("Tracing.tracingComplete", () => resolve()));
 await client.send("Tracing.start", {
   categories: ["devtools.timeline", "v8", "v8.execute", "disabled-by-default-devtools.timeline", "blink.user_timing", "toplevel"].join(","),

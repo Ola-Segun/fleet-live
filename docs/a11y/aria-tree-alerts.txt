@@ -3,308 +3,308 @@
   - button "Resolve all ended" [disabled]
   - list "Open alerts":
     - listitem:
-      - paragraph: FKJ-895RV speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: IKD-877PW speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: AGL-143LC speeding, up to 78 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: KJA-632BY speeding, up to 80 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: KTU-696UX speeding, up to 76 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: AGL-707AQ speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: FKJ-941WW speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: LND-405FP speeding, up to 77 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: KTU-156WA speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: KJA-411NU speeding, up to 62 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: IKD-404ZA speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: EKY-957RV speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: BDG-794HM speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: BDG-870TU speeding, up to 76 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: FKJ-286SR speeding, up to 74 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: FKJ-535KX speeding, up to 69 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: EPE-390EX speeding, up to 77 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: LND-762WG speeding, up to 75 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: BDG-401JS speeding, up to 72 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: BDG-956JQ speeding, up to 78 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: EPE-723JU speeding, up to 72 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: FKJ-451KQ speeding, up to 77 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: KJA-262SQ speeding, up to 74 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: IKD-208PS speeding, up to 75 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: KTU-845EL speeding, up to 76 km/h
-      - paragraph: Active, raised 22:30:38
+      - paragraph: EPE-770RV speeding, up to 77 km/h
+      - paragraph: Active, raised 22:30:12
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
       - paragraph: MUS-674UD speeding, up to 80 km/h
-      - paragraph: Active, raised 22:30:38
+      - paragraph: Active, raised 22:30:12
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: KTU-403EP speeding, up to 67 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: AGL-542YZ speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: EKY-170RY speeding, up to 78 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: LND-763KM speeding, up to 80 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: IKD-760WV speeding, up to 78 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: EPE-630WS speeding, up to 69 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: APP-771VA speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
+      - paragraph: EKY-170RY speeding, up to 77 km/h
+      - paragraph: Active, raised 22:30:12
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
       - paragraph: EPE-660MC speeding, up to 75 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: LND-912YT speeding, up to 64 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: AGL-557CF speeding, up to 75 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: FKJ-985NE speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: LND-598QG speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: APP-726MS speeding, up to 80 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: LND-459YQ speeding, up to 82 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: IKD-857SS speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: SMK-153NJ speeding, up to 73 km/h
-      - paragraph: Active, raised 22:30:38
+      - paragraph: Active, raised 22:30:12
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
       - paragraph: SMK-578KF speeding, up to 71 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KJA-411NU speeding, up to 61 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: EKY-957RV speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: BDG-794HM speeding, up to 73 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: BDG-870TU speeding, up to 75 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: FKJ-895RV speeding, up to 73 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: FKJ-286SR speeding, up to 72 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: IKD-877PW speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
       - paragraph: KTU-990YC speeding, up to 70 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: EPE-770RV speeding, up to 77 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: EPE-390EX speeding, up to 76 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: EPE-823SW speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: LND-762WG speeding, up to 75 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: KJA-767TC speeding, up to 78 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: AGL-143LC speeding, up to 78 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: APP-684RB speeding, up to 69 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: BDG-401JS speeding, up to 69 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: BDG-197NF speeding, up to 81 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: EPE-723JU speeding, up to 71 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: LND-548MQ speeding, up to 76 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: KTU-845EL speeding, up to 76 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: AGL-542YZ speeding, up to 73 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: AGL-707AQ speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: IKD-760WV speeding, up to 77 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: APP-771VA speeding, up to 81 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
       - paragraph: EKY-637CN speeding, up to 79 km/h
-      - paragraph: Active, raised 22:30:37
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: FKJ-941WW speeding, up to 81 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: LND-459YQ speeding, up to 79 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: IKD-857SS speeding, up to 73 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: LND-405FP speeding, up to 77 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KTU-156WA speeding, up to 72 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: SMK-153NJ speeding, up to 72 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: IKD-404ZA speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: FKJ-535KX speeding, up to 70 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: EPE-823SW speeding, up to 81 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KJA-632BY speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: BDG-956JQ speeding, up to 78 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KJA-767TC speeding, up to 78 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: FKJ-451KQ speeding, up to 77 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KJA-262SQ speeding, up to 73 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: IKD-208PS speeding, up to 75 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KTU-696UX speeding, up to 75 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: KTU-403EP speeding, up to 66 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: LND-763KM speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: EPE-630WS speeding, up to 69 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: APP-684RB speeding, up to 68 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: LND-912YT speeding, up to 64 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: AGL-557CF speeding, up to 75 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: BDG-197NF speeding, up to 81 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: FKJ-985NE speeding, up to 81 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: LND-598QG speeding, up to 73 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: LND-548MQ speeding, up to 75 km/h
+      - paragraph: Active, raised 22:30:11
+      - button "Show truck"
+      - button "Acknowledge"
+      - button "Resolve"
+    - listitem:
+      - paragraph: APP-726MS speeding, up to 80 km/h
+      - paragraph: Active, raised 22:30:11
       - button "Show truck"
       - button "Acknowledge"
       - button "Resolve"

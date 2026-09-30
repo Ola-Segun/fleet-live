@@ -18,7 +18,7 @@ how it's engineered and proved.
 | 8a | Find, inspect, follow, list (`apps/web`) | What a dispatcher actually uses: search, details, follow, the accessible list | **Done** |
 | 8b | Alerts and geofences (`packages/alerts`, `apps/web`) | Tells the dispatcher what needs attention, instead of making them look | **Done** |
 | 9 | Replay (`packages/replay`, `apps/web`) | Answers "what happened at 14:05?" using the same renderer | **Done** |
-| 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | Next |
+| 10 | Quality gates and ship (`.github`, `scripts`, `README.md`) | Proves all of the above in CI, then publishes it | **Built**; publishing awaits the owner |
 
 ---
 
@@ -1227,7 +1227,7 @@ The theme is an input, like viewport size, and the checks now cover both.
 | **Diamond shape, violet** | Status is never colour alone (design §8). The diamond is distinct from the arrow, dot and ring, and shows at every zoom, including the dot zooms |
 | **Zones as stock MapLibre layers** | A handful of polygons that change only when edited is exactly what GeoJSON sources are good at, unlike 5,000 moving trucks. Restricted zones have a solid edge and depots a dashed one, not colour alone. Re-added on every style load, like the truck layer |
 | **Zones in localStorage, read back through the importer** | A few KB, and a synchronous API suits `useSyncExternalStore`. The stored form is the export format. It is validated like a pasted file, because stored data is untrusted too. DESIGN.md said IndexedDB; changed there, with the reason |
-| **Announcements gathered** | New alerts are queued and spoken at most once every 5 s, as one sentence: "3 new alerts. Latest: …". A screen reader that read each one as it landed would talk over everything |
+| **Announcements gathered** | New alerts are queued and spoken at most once every 5 s, as one sentence: "3 new alerts. Latest: …". A screen reader that read each one as it landed would talk over everything. *Corrected in Layer 10: this first version went silent after its first announcement, and the browser check's recorder hid it* |
 | **The list holds still while in use** | See "found while building", item 5 |
 | **Drawing without a pointer** | "Add corner at map centre" drops a corner under a crosshair, and the map pans with the arrow keys. Backspace removes a corner, Enter closes the shape, Escape cancels. Importing GeoJSON needs no pointing at all |
 
@@ -1294,7 +1294,7 @@ medians of 5, and the range is across three runs on a noisy laptop.
 
 - **`smoke:alerts` 17/17. `smoke:ui` 18/18. `smoke:web`:** 60 fps, and context
   loss recovered.
-- **`a11y`: 0 violations** in 11 states. That includes the Alerts and Zones
+- **`a11y`: 0 violations** in 9 states (first written as 11: a miscount, corrected in Layer 10). That includes the Alerts and Zones
   tabs, in light and dark.
 - **`a11y:contrast`: 0 failures** across about 1,900 text elements and control
   borders. All three tabs were checked, in both schemes, on desktop and phone.
@@ -1475,7 +1475,7 @@ truth at each moment, as the shader computes it from the packed rows.
   so. Back to live works, and every tracked truck is drawn live again.
 - **The rest still passes:** `smoke:ui` 18/18 (60 fps, 0 long tasks),
   `smoke:alerts` 17/17, `smoke:web` 60 fps with context loss recovered.
-- **`a11y`: 0 violations** in 13 states, including replaying in light and dark.
+- **`a11y`: 0 violations** in 11 states (first written as 13: a miscount, corrected in Layer 10), including replaying in light and dark.
 - **`a11y:contrast`: 0 failures** across about 2,100 elements, replay
   included.
 
@@ -1543,3 +1543,139 @@ every truck: about 7% of one Worker core at 2 Hz while replaying.
 - `pnpm smoke:alerts`
 - `pnpm a11y`
 - `pnpm a11y:contrast`
+
+---
+
+## Layer 10 · Quality gates and ship
+
+**Why this layer exists**
+
+- **A check that only runs on one laptop proves one laptop.** Every layer
+  so far was verified by commands run by hand. Once other people change the
+  code, or the author forgets a step, nothing stops a regression. CI makes
+  the checks run on every change, on a machine nobody configured by hand.
+- **A project nobody can open doesn't count.** The README, the walkthrough
+  and a deploy are what turn a repository into something a reviewer can
+  judge in five minutes, with every claim linked to where it was measured.
+- **CI can't be allowed to lie either.** A runner has no GPU. Gating frame
+  rates there would either fail every time or be loosened until it proved
+  nothing, so this layer decides explicitly what CI gates and what it only
+  records.
+
+**What exists**
+
+| Part | What it does |
+| --- | --- |
+| `.github/workflows/ci.yml` | On every push and pull request: typecheck (now including the browser scripts), lint, 224 tests, a production build and the bundle budget. Then every browser check against the built app in Chromium, with screenshots and accessibility trees kept as artifacts |
+| `.github/workflows/evaluate.yml` | Weekly and on demand: every evaluation against ground truth and every benchmark, with output kept as artifacts |
+| `scripts/browser.mts` | One launcher for every browser check: the installed Chrome on its GPU locally, Playwright's Chromium with software WebGL in CI. The base URL, readiness waits that scale with the renderer, and `timing()`, which gates frame times only on a real GPU |
+| `scripts/bundle-size.mts` | A gzipped budget: 230 KB up front (measured 200), 430 KB for the largest lazy chunk (measured 372, the route data), 1,030 KB in all (measured 892) |
+| `scripts/screenshots.mts` | The README's pictures, regenerated from the running app |
+| `README.md`, `docs/QUALITY.md`, `docs/WALKTHROUGH.md`, `docs/DEPLOY.md` | What the project is and why it's interesting, with every number linked to its measurement. What each gate proves. A five-minute tour. How to deploy |
+| Light/dark button (committed just before this layer) | Follows the system until pressed, then remembers. Applied before the first paint by an inline `<head>` script, as the bundled Next.js guide recommends |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **CI gates correctness and accessibility, and only records timing** | Software WebGL draws this fleet at about 5 fps on the dev laptop (60 on its GPU). Frame times there say nothing about a real device. Everything else gates exactly as locally |
+| **The software path was run locally before any push** | `CI=true` (or `SOFTWARE_GL=1`) forces SwiftShader in the installed Chrome. The whole suite was run that way, and it found four checks that were really timing checks (below) |
+| **Every script exits non-zero on failure** | Two didn't: the web smoke test and the contrast sweep only printed. A gate that can't fail isn't one |
+| **Budgets set from measurement, plus about 15%** | The first budget was guessed before measuring, and failed. Budgets exist to notice growth, and are raised on purpose |
+| **Evaluations weekly, not per push** | The alerts evaluation alone takes about 10 minutes. The evaluations are deterministic, so a changed number means changed behaviour |
+| **The deploy is demo mode, as a static page** | The simulator runs in the browser's Worker, so there's no server to host or pay for |
+| **Nothing is published without the owner's say-so** | Creating the GitHub repository and connecting Vercel are left for the owner to approve (docs/DEPLOY.md) |
+
+**Checks run for this layer** (final code, built app)
+
+- **On the GPU:**
+  - `smoke:web` passed: p99 16.9 ms, 0 long tasks.
+  - `smoke:ui` 22/22, `smoke:alerts` 17/17, `smoke:replay` 11/11.
+  - axe: 0 violations in 11 states. Contrast: 0 failures.
+- **With software WebGL (the CI path, `CI=true`):**
+  - `smoke:web` passed at about 5 fps, with timing recorded and not gated.
+  - `smoke:ui` 22/22, `smoke:replay` 11/11, `smoke:alerts`
+    17/17 (4 announcements in its last 25 s).
+  - The contrast sweep passed.
+  - axe: 0 violations in 11 states. That run came before the warm-up and
+    announcer fixes, neither of which touches markup.
+- `pnpm install --frozen-lockfile` is clean. `pnpm check` passes (224 tests)
+  and so does `pnpm bundle:size`.
+
+**Found while building**
+
+1. **Four checks were really timing checks.** They passed on the GPU and
+   failed under software rendering:
+   - "Trucks keep drawing after the theme switch" required more than 30
+     frames a second.
+   - "Drawn again after replay" required more than 50.
+   - The replay comparison needed live samples under 100 ms apart.
+   - The replay stress loop assumed 60× wouldn't catch up with live between
+     jumps.
+
+   Each now asks the functional question, with thresholds that scale with
+   the renderer.
+2. **A suspected bug that wasn't.** A followed truck turned stale under
+   software rendering. The suspicion was that the simulator couldn't keep
+   up, so the display clock ran ahead of the data, which would hit weak
+   phones in demo mode too. Measured: display time tracked wall time 1:1,
+   and 0 of 196 sampled trucks were stale. The truck itself was stale (a
+   coverage gap), and a camera that stays on a stale truck is correct. The
+   check was wrong to demand movement. It now checks that the camera stays
+   on the truck.
+3. **Readiness waits were tuned to one GPU.** A 40 s "the map is drawing"
+   wait, and 120 s for the first alert, were too short for software
+   rendering. They now scale with it.
+4. **I had miscounted the accessibility states.** Layer 8b said 11 when its
+   run scanned 9, and Layer 9 said 13 when it scanned 11. Every scan found 0
+   violations, but the counts were wrong. They're corrected where they
+   appeared, and the count now comes from the run's output, not from memory.
+5. **The first bundle budget failed.** It was set before measuring. The page
+   needs 200 KB up front, mostly React and the Next.js runtime; the map
+   library (271 KB) and route data (372 KB) load later.
+6. **Every demo truck started from rest.** A check failed because, a few
+   seconds after load, the fastest of 5,000 trucks was doing 6 km/h. At
+   0.6 m/s² the whole fleet crawled for its first 20 s or so and sped up in
+   unison: the first thing a visitor would see.
+   - Demo mode now starts the simulated day 30 s early and simulates that
+     stretch before going live.
+   - From the first seconds, the fastest trucks now do 46–48 km/h, the
+     simulator's own figure for that hour.
+   - It costs about 1.7 s of Worker time at start. The first trucks draw
+     about 4 s after navigation.
+   - The simulator itself is unchanged, so every recorded evaluation still
+     holds.
+7. **The replay bar covered the map's attribution.** The README screenshot
+   showed "OpenFreeMap" cut off at the bottom right. That attribution is
+   required by the OpenStreetMap and OpenMapTiles licences. The bar now
+   sits above it, and `smoke:ui` checks the two don't overlap.
+8. **Alert announcements fell silent after the first (a real bug from Layer
+   8b).** The announcer kept its timer in a React effect that re-ran on
+   every alerts message (twice a second, new alerts or not) and cancelled
+   the pending announcement each time. A screen-reader user heard the first
+   alert and then, almost always, nothing.
+   - Layer 8b's check didn't catch it, because its recorder was also wrong.
+     It re-read every live region on any change, so alternating regions
+     recorded the same sentence again and again: "5 announcements" were
+     really one or two.
+   - The recorder now records a region only when its own text changes.
+   - The check now listens for 25 s and requires announcements to keep
+     coming, never closer than 5 s apart.
+   - Run against the old announcer, it fails: 2 announcements in 45 s, 18.5 s
+     apart. With the fix, 70 s of watching gave 8 announcements, never closer
+     than 5 s.
+   - The announcer is now a small `Gather` class that owns one timer
+     regardless of message traffic, with a unit test (a burst over 20 s is
+     spoken at 0, 5, 10, 15 and 20 s, with nothing lost).
+9. **One check depended on the hour.** The replay check picked trucks faster
+   than 10 km/h, and in the evening peak just after load there were none.
+   It now runs at `?at=2230`, whatever the hour.
+
+**Not done here**
+
+- **Nothing is published.** There's no GitHub repository and no Vercel
+  project yet, so the workflows haven't run on GitHub: they're verified only
+  by running their steps locally, including the software-WebGL path. The
+  first push will be their first real run.
+- **No licence has been chosen.**
+- **The manual NVDA pass** is still to do.
