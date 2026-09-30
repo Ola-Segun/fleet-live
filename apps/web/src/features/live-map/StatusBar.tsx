@@ -40,11 +40,16 @@ export function StatusBar({ status, error, subscribe }: Props) {
   const { connection, feed, delayMs, mode } = status;
   const live = connection.state === "open";
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-700" aria-live="polite">
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-700">
       <span className="font-medium">{mode === "demo" ? "Demo fleet" : "Network"}</span>
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${live ? "bg-emerald-500" : "bg-amber-500"}`} />
         {STATE_LABEL[connection.state]}
+      </span>
+      {/* Only a change of connection state is worth interrupting a screen reader for. The counts and
+          the delay shift constantly, so the whole line as a live region would never stop talking. */}
+      <span className="sr-only" aria-live="polite">
+        {`Connection ${STATE_LABEL[connection.state].toLowerCase()}`}
       </span>
       <span>{number.format(trucks)} trucks</span>
       <span>as of {(delayMs / 1000).toFixed(1)} s ago</span>

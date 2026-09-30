@@ -20,7 +20,9 @@ Option 3. Each truck's last 8 samples live in an RGBA32F texture. One
 instanced draw call renders the fleet, and the vertex shader finds the two
 samples around the display time and interpolates, every frame.
 
-## Measured (same page, same laptop, headless Chrome with software WebGL)
+## Measured (same page, same laptop, headless Chrome on the integrated Intel UHD GPU)
+
+> **Correction (30 Sep 2026):** earlier versions of this record said these numbers came from software WebGL. They didn't. Headless Chrome on this laptop renders on the Intel UHD GPU through ANGLE/Direct3D 11 (checked by asking WebGL for its unmasked renderer). The measurements stand, and the caveat was wrong.
 
 | Truck layer | Long tasks in 10 s steady state | Frame interval p95 | Truck layer CPU per frame |
 | --- | --- | --- | --- |

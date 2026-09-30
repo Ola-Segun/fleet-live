@@ -8,8 +8,9 @@
  * Queries: (none) = WebGL layer · ?layer=baseline = Layer 6's GeoJSON layer ·
  * ?trucks=off = the map alone. Comparing the three measures each layer by difference.
  *
- * Headless Chrome renders WebGL in software (SwiftShader), so absolute frame
- * rates are pessimistic. The comparison is fair because only the layer changes.
+ * Headless Chrome here renders on the laptop's Intel UHD GPU (ANGLE/Direct3D 11,
+ * checked via WEBGL_debug_renderer_info). The comparison is fair because only
+ * the layer changes.
  */
 import { chromium } from "@playwright/test";
 
@@ -18,7 +19,6 @@ const base = "http://127.0.0.1:3100/";
 const browser = await chromium.launch({
   executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   headless: true,
-  args: ["--enable-unsafe-swiftshader"],
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors: string[] = [];

@@ -13,7 +13,6 @@ const base = "http://127.0.0.1:3100/";
 const browser = await chromium.launch({
   executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   headless: true,
-  args: ["--enable-unsafe-swiftshader"],
 });
 const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => results.push([name, ok, detail]);
@@ -84,14 +83,38 @@ await sleep(300);
 const pickMs = (await page.evaluate("window.__fleetPerf.lastPickMs")) as number;
 check("clicking a truck on the map selects a truck", param(page, "v") !== null, `pick took ${pickMs.toFixed(1)} ms over ~5,000 trucks`);
 
+// Closing the panel with its button returns focus to the list, not to the top of the page.
+await page.getByRole("button", { name: "Close truck details" }).click();
+await sleep(300);
+check("closing the details panel puts keyboard focus back on the list", (await page.evaluate("document.activeElement?.getAttribute('role')")) === "listbox" && param(page, "v") === null);
+
+await page.locator('[role="option"]').first().click();
+await page.getByRole("heading", { level: 2 }).waitFor({ timeout: 5000 });
+await page.locator("body").click({ position: { x: 5, y: 5 } });
 await page.keyboard.press("Escape");
 await sleep(300);
 check("Escape clears the selection", param(page, "v") === null && (await page.getByRole("heading", { level: 2 }).count()) === 0);
 
+// Single-key shortcuts can be turned off (WCAG 2.1.4), and the choice survives a reload.
+await page.getByRole("button", { name: /Single-key shortcuts/ }).click();
+await page.locator('[role="option"]').first().click();
+await page.getByRole("heading", { level: 2 }).waitFor({ timeout: 5000 });
+await page.locator("body").click({ position: { x: 5, y: 5 } });
+await page.keyboard.press("f");
+await sleep(400);
+const stillOff = param(page, "f") === null;
+await page.reload();
+await page.waitForSelector('[role="option"]', { timeout: 30_000 });
+const persisted = (await page.getByRole("button", { name: /Single-key shortcuts/ }).innerText()).includes("off");
+check("single-key shortcuts can be switched off, and stay off after a reload", stillOff && persisted);
+await page.getByRole("button", { name: /Single-key shortcuts/ }).click(); // back on for the rest
+await page.keyboard.press("Escape");
+
 // Filters: turn Parked off.
 await page.locator("#fleet-search").fill("");
 await sleep(600);
-const countText = () => page.locator('span[aria-live="polite"]').first().innerText();
+// The visible "N of M trucks" line (the live region now speaks only when the person changes the search or filters).
+const countText = () => page.getByText(/^[\d,]+ of [\d,]+ trucks$/).innerText();
 const before = await countText();
 await page.getByRole("button", { name: /^Parked/ }).click();
 await sleep(800);

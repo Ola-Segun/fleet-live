@@ -1,0 +1,72 @@
+- link "Skip to truck search":
+  - /url: "#fleet-search"
+- banner:
+  - heading "Fleet Live" [level=1]
+  - 'button "Single-key shortcuts: on" [pressed]'
+  - paragraph: Demo fleet Live Connection live 4,950 trucks as of 1.3 s ago
+- complementary:
+  - region "Fleet":
+    - text: Search trucks by plate or driver
+    - searchbox "Search trucks by plate or driver"
+    - group "Show statuses":
+      - button "Moving 4,179" [pressed]
+      - button "Parked 771" [pressed]
+      - button "Stale 0" [pressed]
+    - text: 4,950 of 4,950 trucks 0 trucks shown Sort
+    - combobox "Sort":
+      - option "Needs attention" [selected]
+      - option "Plate"
+      - option "Speed"
+    - listbox "Trucks":
+      - option "AGL-126AA Sani Olawale Moving, projected, 13 km/h"
+      - option "AGL-138WR Sani Eze Moving, projected, 13 km/h"
+      - option "AGL-157VT Chinedu Mohammed Moving, projected, 13 km/h"
+      - option "AGL-213PN Tunde Nwankwo Moving, projected, 14 km/h"
+      - option "AGL-435ZR Abdullahi Onyeka Moving, projected, 14 km/h"
+      - option "AGL-504NW Yusuf Ogunleye Moving, projected, 15 km/h"
+      - option "AGL-652BN Aliyu Eze Moving, projected, 14 km/h"
+      - option "AGL-654AR Chinedu Olawale Moving, projected, 13 km/h"
+      - option "AGL-687RH Femi Balogun Moving, projected, 15 km/h" [selected]
+      - option "AGL-718CT Chinedu Yakubu Moving, projected, 13 km/h"
+      - option "AGL-724XU Gbenga Chukwu Moving, projected, 14 km/h"
+      - option "AGL-773WW Aliyu Okonkwo Moving, projected, 13 km/h"
+      - option "AGL-845WV Abdullahi Afolabi Moving, projected, 14 km/h"
+      - option "AGL-885XZ Kunle Okafor Moving, projected, 14 km/h"
+      - option "APP-195QZ Ibrahim Onyeka Moving, projected, 13 km/h"
+      - option "APP-325EZ Femi Olawale Moving, projected, 14 km/h"
+      - option "APP-394TG Aliyu Ogunleye Moving, projected, 14 km/h"
+      - option "APP-478FP Segun Adebisi Moving, projected, 13 km/h"
+      - option "APP-545BM Abdullahi Nwankwo Moving, projected, 13 km/h"
+      - option "APP-574NH Chinedu Olawale Moving, projected, 15 km/h"
+      - option "APP-603BM Gbenga Onyeka Moving, projected, 14 km/h"
+      - option "APP-726MS Kunle Garba Moving, projected, 14 km/h"
+      - option "APP-840HB Yusuf Afolabi Moving, projected, 15 km/h"
+- main:
+  - region "Map of the fleet":
+    - region "Map"
+    - button "Zoom in"
+    - button "Zoom out"
+    - button "Drag to rotate map, click to reset north"
+    - group:
+      - link "OpenFreeMap":
+        - /url: https://openfreemap.org
+      - link "© OpenMapTiles":
+        - /url: https://www.openmaptiles.org/
+      - text: Data from
+      - link "OpenStreetMap":
+        - /url: https://www.openstreetmap.org/copyright
+  - region "AGL-687RH":
+    - heading "AGL-687RH" [level=2]
+    - paragraph: Femi Balogun
+    - button "Close truck details": ✕
+    - term: Status
+    - definition: Moving, projected
+    - term: Speed
+    - definition: 15 km/h
+    - term: Heading
+    - definition: NW (325°)
+    - term: Last report
+    - definition: just now
+    - button "Follow on map"
+- paragraph: AGL-687RH selected, Moving.
+- alert
