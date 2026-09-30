@@ -78,6 +78,19 @@ await phone.getByRole("button", { name: "Show trucks" }).tap();
 await phone.waitForSelector('[role="option"]');
 await scan(phone, "phone, sheet open");
 
+// The same states in dark mode. Checks that only ran in light mode missed near-white text on white panels.
+const darkDesktop = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" })).newPage();
+await ready(darkDesktop, base);
+await darkDesktop.locator('[role="option"]').nth(2).click();
+await darkDesktop.getByRole("heading", { level: 2 }).waitFor();
+await scan(darkDesktop, "desktop, dark mode, a truck selected");
+const darkPhone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: "dark" })).newPage();
+await ready(darkPhone, base);
+await darkPhone.getByRole("button", { name: "Show trucks" }).tap();
+await darkPhone.waitForSelector('[role="option"]');
+await scan(darkPhone, "phone, dark mode, sheet open");
+await darkDesktop.screenshot({ path: "scripts/a11y-dark-desktop.png" });
+
 await browser.close();
 console.log(failed ? "\nviolations found" : "\nno violations");
 process.exit(failed ? 1 : 0);

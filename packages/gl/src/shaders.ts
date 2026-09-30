@@ -123,6 +123,7 @@ in vec2 v_local;
 flat in int v_mode;
 flat in int v_selected;
 uniform float u_detail;                   // 0 at low zoom: every truck a plain dot
+uniform float u_dark;                     // 1 on a dark basemap
 out vec4 outColor;
 
 // Signed distances in the quad's local space, [-1, 1]. Negative is inside.
@@ -145,7 +146,8 @@ void main() {
     float shape = (v_mode == ${MODE_CODES.parked} || v_mode == ${MODE_CODES.stale}) ? circle(v_local, 0.32) : arrow(v_local * 1.7);
     float ring = abs(circle(v_local, 0.8)) - 0.09;
     d = min(shape, ring);
-    color = vec3(0.07, 0.09, 0.15);
+    // Navy on a light map, near-white on a dark one: a dark ring on a dark map would vanish.
+    color = mix(vec3(0.07, 0.09, 0.15), vec3(0.98, 0.98, 0.98), u_dark);
   } else if (u_detail < 0.5) {
     d = circle(v_local, 0.8);
     color = v_mode == ${MODE_CODES.parked} ? vec3(0.42, 0.45, 0.50) : v_mode == ${MODE_CODES.stale} ? vec3(0.86, 0.15, 0.15) : vec3(0.15, 0.39, 0.92);

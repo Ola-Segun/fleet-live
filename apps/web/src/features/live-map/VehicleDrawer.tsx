@@ -45,40 +45,40 @@ export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, on
   const age = i >= 0 ? Math.max(0, snapshot!.ageMs[i]! / 1000) : undefined;
 
   return (
-    <section aria-labelledby="drawer-title" className="rounded-lg border border-zinc-200 bg-white p-4 shadow-lg [contain:content]">
+    <section aria-labelledby="drawer-title" className="rounded-lg border border-line bg-surface p-4 shadow-lg [contain:content]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="drawer-title" className="font-mono text-lg font-semibold">
             {info?.plate ?? `#${vehicleId}`}
           </h2>
-          <p className="text-sm text-zinc-600">{info?.driver ?? "Driver details loading…"}</p>
+          <p className="text-sm text-muted">{info?.driver ?? "Driver details loading…"}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close truck details"
-          className="grid h-8 w-8 place-items-center rounded-md text-zinc-600 hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-blue-600"
+          className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent"
         >
           ✕
         </button>
       </div>
 
       {mode === undefined ? (
-        <p className="mt-3 text-sm text-zinc-600">Waiting for the first report from this truck…</p>
+        <p className="mt-3 text-sm text-muted">Waiting for the first report from this truck…</p>
       ) : (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt className="text-zinc-600">Status</dt>
+          <dt className="text-muted">Status</dt>
           <dd className="flex items-center gap-1.5">
             <StatusIcon mode={mode} heading={heading} />
             {MODE_LABEL[mode]}
           </dd>
-          <dt className="text-zinc-600">Speed</dt>
+          <dt className="text-muted">Speed</dt>
           <dd className="tabular-nums">{Math.round(speed)} km/h</dd>
-          <dt className="text-zinc-600">Heading</dt>
+          <dt className="text-muted">Heading</dt>
           <dd className="tabular-nums">
             {compass(heading)} ({Math.round(heading)}°)
           </dd>
-          <dt className="text-zinc-600">Last report</dt>
+          <dt className="text-muted">Last report</dt>
           <dd className="tabular-nums">{age === undefined ? "–" : age < 1 ? "just now" : `${Math.round(age)} s ago`}</dd>
         </dl>
       )}
@@ -87,7 +87,7 @@ export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, on
         type="button"
         aria-pressed={follow}
         onClick={() => onFollow(!follow)}
-        className="mt-4 w-full rounded-md border px-3 py-2 text-sm font-medium aria-pressed:border-blue-700 aria-pressed:bg-blue-700 aria-pressed:text-white aria-[pressed=false]:border-zinc-500 focus-visible:ring-2 focus-visible:ring-blue-600"
+        className="mt-4 w-full rounded-md border px-3 py-2 text-sm font-medium aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-fg aria-[pressed=false]:border-control focus-visible:ring-2 focus-visible:ring-accent"
       >
         {follow ? "Following" : "Follow on map"}
       </button>

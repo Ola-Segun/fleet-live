@@ -1131,3 +1131,48 @@ per frame. That reading was withdrawn before any change was made.
 - `pnpm a11y:contrast`
 - `pnpm smoke:ui`
 - `pnpm profile:frames`
+
+## Found from a screenshot: dark mode was unreadable
+
+**Why this needed fixing.** Segun ran the app on a laptop set to a dark
+system theme. Truck plates, names and headings were near-invisible. Every
+check up to then had run in light mode only, so none of them could see it.
+About a third of people browse with a dark theme, so this wasn't a corner
+case.
+
+**Cause.** The create-next-app template switches the page's default text
+colour to near-white in dark mode. The panels had fixed white backgrounds. Any
+text that didn't set its own colour became near-white on white.
+
+**Fix.**
+
+- **One set of colour tokens with a light and a dark value**
+  (`globals.css`): page, surface, text, muted, control border, accent, chip and
+  so on. Components use only the token names (`bg-surface`, `text-muted`,
+  `border-control`), never a fixed palette colour. The only exception is the
+  developer perf HUD, which is dark in both schemes on purpose.
+- **A dark basemap** (OpenFreeMap `dark`) when the system is dark. It swaps
+  live if the theme changes mid-session. A style swap drops custom layers, just
+  as a lost WebGL context does, so both paths share one `ensureVehicleLayer`
+  helper that re-adds the truck layer when the new style accepts it.
+- **The selected truck's ring** is navy on the light map and near-white on the
+  dark one, through a `u_dark` uniform. A navy ring on a dark map would vanish.
+- **The map's zoom controls moved to the bottom right.** In the top right, the
+  truck details panel covered them. `smoke:ui` now checks that the two don't
+  overlap.
+
+**Proved.** The contrast sweep and axe now run in both schemes.
+
+| Check | Before the fix | After |
+| --- | --- | --- |
+| Contrast sweep, dark, desktop | 32 of 130 text elements fail, at **1.08:1** | 0 fail. Text min 5.73:1, control borders 6.91:1 |
+| Contrast sweep, dark, phone | 18 of 71 fail, at 1.08:1 | 0 fail |
+| Contrast sweep, light (both sizes) | 0 fail (this is why it was missed) | 0 fail |
+| axe, 5 states including 2 dark | not run in dark mode | 0 violations |
+| `smoke:ui` | 17 checks | 18 of 18, still 60 fps, p99 frame 16.8 ms |
+
+The "before" column comes from running the new dark checks against the old
+code. That shows the checks catch this bug, rather than assuming it.
+
+**Lesson.** A check that runs in one configuration proves one configuration.
+The theme is an input, like viewport size, and the checks now cover both.

@@ -30,6 +30,8 @@ export class FleetGpuState {
   selectedId: number | undefined;
   /** Status filter as a bit mask over mode codes (see @fleet/gl modeMask). */
   mask = modeMask(ALL_GROUPS);
+  /** Dark basemap: the selection ring is drawn light instead of navy, or it would vanish. */
+  dark = false;
   rowsReceived = 0;
   /** Called after every update, so a mounted layer can ask for a repaint. */
   onChange: (() => void) | undefined;
@@ -73,6 +75,11 @@ export class FleetGpuState {
     const slot = this.slotOf.get(vehicleId);
     if (slot === undefined || this.epoch === undefined || this.lastDisplay === undefined) return undefined;
     return slotEstimate(this.mirror.data, slot, (this.lastDisplay - this.epoch) / 1000);
+  }
+
+  setDark(dark: boolean): void {
+    this.dark = dark;
+    this.onChange?.();
   }
 
   /** Is this mode shown under the current filter? */

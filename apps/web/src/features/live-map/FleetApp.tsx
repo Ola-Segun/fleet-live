@@ -20,7 +20,7 @@ import { useFleet } from "./use-fleet";
 // still renders on the server; only this component waits for the browser.
 const LiveMap = dynamic(() => import("./LiveMap"), {
   ssr: false,
-  loading: () => <div className="absolute inset-0 animate-pulse bg-zinc-100" aria-hidden />,
+  loading: () => <div className="absolute inset-0 animate-pulse bg-hover" aria-hidden />,
 });
 
 const isTyping = (target: EventTarget | null) =>
@@ -46,6 +46,7 @@ export function FleetApp() {
   const hud = params.get("hud") === "1";
   // Tailwind's `md` breakpoint. Decides which layout *exists*, so there is only ever one fleet panel.
   const desktop = useMediaQuery("(min-width: 768px)", true);
+  const dark = useMediaQuery("(prefers-color-scheme: dark)", false);
   // Single-key shortcuts can be switched off (WCAG 2.1.4).
   const shortcuts = useShortcutsOn();
 
@@ -122,18 +123,18 @@ export function FleetApp() {
     <div className="flex h-dvh flex-col">
       <a
         href="#fleet-search"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2 focus:shadow"
       >
         Skip to truck search
       </a>
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-white px-4 py-2">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2">
         <div className="flex items-center gap-3">
           <h1 className="text-base font-semibold">Fleet Live</h1>
           <button
             type="button"
             aria-pressed={shortcuts}
             onClick={() => setShortcutsOn(!shortcuts)}
-            className="min-h-8 rounded-md border border-zinc-500 px-2 text-xs text-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-600"
+            className="min-h-8 rounded-md border border-control px-2 text-xs text-muted focus-visible:ring-2 focus-visible:ring-accent"
           >
             Single-key shortcuts: {shortcuts ? "on" : "off"}
           </button>
@@ -144,7 +145,7 @@ export function FleetApp() {
       <div className="relative flex min-h-0 flex-1">
         {/* Desktop: the list beside the map. Phone: a bottom sheet over the map (below). */}
         {desktop && (
-          <aside className="w-[22rem] shrink-0 border-r border-zinc-200 bg-white [contain:content]">{panel}</aside>
+          <aside className="w-[22rem] shrink-0 border-r border-line bg-surface [contain:content]">{panel}</aside>
         )}
 
         <main className="relative min-w-0 flex-1">
@@ -157,6 +158,7 @@ export function FleetApp() {
             follow={ui.follow}
             onPick={select}
             onUserMove={() => patch({ follow: false })}
+            dark={dark}
           />
           {desktop && drawer && <div className="absolute right-3 top-3 z-10 w-80">{drawer}</div>}
           {hud && <PerfHud gpu={gpu} />}
@@ -164,7 +166,7 @@ export function FleetApp() {
 
         {!desktop && (
           <div
-            className={`absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl border-t border-zinc-200 bg-white shadow-2xl ${
+            className={`absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl border-t border-line bg-surface shadow-2xl ${
               sheetOpen ? "h-[60dvh]" : "h-16"
             }`}
           >
@@ -175,7 +177,7 @@ export function FleetApp() {
               onClick={() => setSheetOpen((o) => !o)}
               className="flex min-h-12 items-center justify-center gap-2 text-sm font-medium"
             >
-              <span aria-hidden className="h-1 w-10 rounded-full bg-zinc-300" />
+              <span aria-hidden className="h-1 w-10 rounded-full bg-control" />
               {sheetOpen ? "Hide trucks" : "Show trucks"}
             </button>
             {sheetOpen && (
