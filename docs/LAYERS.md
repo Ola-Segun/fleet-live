@@ -16,8 +16,8 @@ how it's engineered and proved.
 | 6 | Next.js shell, base map, baseline truck layer (`apps/web`) | The frame everything visible sits in, and a measured baseline for Layer 7 to beat | **Done** |
 | 7 | WebGL2 truck layer (`packages/gl`, `apps/web`) | Draws 5,000 moving trucks smoothly, in one draw call | **Done** |
 | 8a | Find, inspect, follow, list (`apps/web`) | What a dispatcher actually uses: search, details, follow, the accessible list | **Done** |
-| 8b | Alerts and geofences | Tells the dispatcher what needs attention, instead of making them look | Next |
-| 9 | Replay | Answers "what happened at 14:05?" using the same renderer | |
+| 8b | Alerts and geofences (`packages/alerts`, `apps/web`) | Tells the dispatcher what needs attention, instead of making them look | **Done** |
+| 9 | Replay | Answers "what happened at 14:05?" using the same renderer | Next |
 | 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | |
 
 ---
@@ -1176,3 +1176,199 @@ code. That shows the checks catch this bug, rather than assuming it.
 
 **Lesson.** A check that runs in one configuration proves one configuration.
 The theme is an input, like viewport size, and the checks now cover both.
+
+---
+
+## Layer 8b · Alerts and geofences
+
+**Why this layer exists**
+
+- **Nobody can watch 5,000 trucks.** After 8a a dispatcher can find any truck,
+  but only if they already know which one to look for. The questions that
+  matter are the ones they don't know to ask: which truck just drove onto a
+  restricted road, which tracker went dark, who is speeding. This layer asks
+  them continuously and answers in a list.
+- **Naive alerts are worse than none.** A plain "inside the zone?" test on
+  noisy GPS fires enter/exit/enter for a truck parked by the edge. The
+  evaluation below measured a naive engine raising 1,036 alerts for 154 real
+  crossings, and a quarter of its speeding alerts being noise. A dispatcher
+  flooded like that stops reading alerts. The engineering here is mostly
+  about *not* raising alerts.
+- **It must not undo Layers 7 and 8a.** Evaluation runs in the Worker. The
+  page receives only the alert list, and the map learns which trucks are
+  alerting through one byte per truck in a second texture.
+
+**What exists**
+
+| Part | What it does |
+| --- | --- |
+| `packages/alerts`: `hysteresis.ts` | One debounced switch used for every edge: a band (20 m past a zone edge, or over 60 km/h and back under 55) and a dwell (10 s without a break). State in typed arrays, one entry per truck |
+| `geometry.ts` | Zones in metres on a flat plane around each zone, a bounding box, and a grid over the edges. Signed distance to the edge: exact within reach, only the side beyond it |
+| `engine.ts` | `AlertEngine`: zone entries and exits, speeding, offline. One open alert per truck, kind and zone. Acknowledge, resolve, resolve all ended, a 500-alert cap that never hides an active one |
+| `geojson.ts`, `presets.ts` | A validating GeoJSON importer (untrusted input: errors name where in the file, never throw) and two demo zones: Third Mainland Bridge (restricted) and Apapa Port (depot) |
+| `sim`: speeders, power loss | 2% of drivers ignore the 55 km/h laden-truck cap, up to 80 km/h. Trackers lose power about 0.02 times an hour for 1–8 minutes, recording nothing. Each has its own random stream |
+| `feed` / `transport` | The estimate and the snapshot now carry the last report's ignition flag. `FleetCore` evaluates each snapshot before transferring it, and posts `alerts` messages |
+| `apps/web` | Trucks / Alerts / Zones tabs. The alert list with acknowledge, resolve and show truck. Zones: draw, import, export, per-zone alert switches, trucks-inside counts. Zones and draft outlines on the map. Violet diamonds for alerting trucks. Alerting trucks first under "Needs attention". Polite announcements |
+| `?at=2230` | Starts the demo at a given Lagos time. At night the speeders speed, so alerts come within a minute (for demos and the browser checks) |
+| `scripts/smoke-alerts.mts` | 17 checks in Chrome: zones drawn, imported, deleted and counted; alerts listed, acknowledged, resolved, shown; diamonds drawn; announcements made |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Evaluate estimates, not raw pings** | The display-time estimates have already been ordered, de-duplicated and clock-corrected by Layer 4, so none of that is redone, and an alert agrees with what the map shows. Cost: alerts use data about 1.4 s old, the display delay |
+| **A band and a dwell** | The band stops a truck *at* the edge from flipping. The dwell stops a single wild fix. The price, about 10–12 s of delay, is measured below |
+| **First sight counts as given** | A truck already inside a newly drawn zone hasn't entered it. Without this, drawing a zone round a depot would raise an alert per parked truck |
+| **Stale trucks hold their state** | A stale truck's position is a guess. Guesses can't start a change |
+| **Offline by ignition, not by speed** | Found by the evaluation (below). A tracker reports every second with the engine on, whether or not the truck moves |
+| **One open alert per truck, kind and zone** | A truck that keeps speeding raises the same alert again: its count goes up and any acknowledgement is cleared. The list can't fill with one truck |
+| **An edge grid** | The inside test only casts its ray against edges in the point's grid row, and the distance test only looks at the 3 × 3 cells around the point. Found by the benchmark (below) |
+| **Alert flags in their own texture** | One byte per truck, uploaded only when alerts change. The packed sample format and its TypeScript twin, `gpuEstimate`, are untouched. Alerting trucks draw in a middle pass, above the rest and below the selected one |
+| **Diamond shape, violet** | Status is never colour alone (design §8). The diamond is distinct from the arrow, dot and ring, and shows at every zoom, including the dot zooms |
+| **Zones as stock MapLibre layers** | A handful of polygons that change only when edited is exactly what GeoJSON sources are good at, unlike 5,000 moving trucks. Restricted zones have a solid edge and depots a dashed one, not colour alone. Re-added on every style load, like the truck layer |
+| **Zones in localStorage, read back through the importer** | A few KB, and a synchronous API suits `useSyncExternalStore`. The stored form is the export format. It is validated like a pasted file, because stored data is untrusted too. DESIGN.md said IndexedDB; changed there, with the reason |
+| **Announcements gathered** | New alerts are queued and spoken at most once every 5 s, as one sentence: "3 new alerts. Latest: …". A screen reader that read each one as it landed would talk over everything |
+| **The list holds still while in use** | See "found while building", item 5 |
+| **Drawing without a pointer** | "Add corner at map centre" drops a corner under a crosshair, and the map pans with the arrow keys. Backspace removes a corner, Enter closes the shape, Escape cancels. Importing GeoJSON needs no pointing at all |
+
+**Tests** (unit, Node): 204 across the repo, up from 154.
+
+- The switch never changes while readings stay in the band. It alternates, and
+  each change follows an unbroken run of at least the dwell (properties).
+- Geometry matches great-circle distance within 0.5 m over 1 km. It gets the
+  side right against a box test. On 300 random star-shaped polygons with holes
+  it agrees with the kept every-edge reference, on the side of every point and
+  on the distance within reach (properties).
+- A truck parked 5 m inside an edge with 4 m of GPS noise raises 0 alerts in
+  10 minutes under the rules, and over 100 without them. An entry is
+  confirmed 120–126 m in at 10 m/s. The peak speed is reported. Speeding ends
+  only below 55. Offline follows the ignition, including the stopped-in-traffic
+  case. Resolve, re-raise, the cap and the drained announcements are all
+  covered.
+- The importer never throws on any JSON (property). Seven kinds of bad input
+  are each rejected with a message saying where. The presets round-trip, and
+  the bridge preset lies on 17 of the committed routes.
+- The sim: a powerless tracker records nothing and resumes with the next
+  sequence number. Speeders pass 55 km/h and stay under 80; nobody else passes
+  55.
+- The web: alert wording in Lagos time, announcements, stored zones (damaged,
+  empty, duplicate ids), alerting trucks sorting first, and the alert texture
+  (including an alert that arrives before its truck has a slot).
+
+**Measured: correctness** (`pnpm --filter @fleet/alerts evaluate`)
+
+2,000 trucks for an hour from 22:30 Lagos time, through the default network
+chaos and the Layer 4 feed. Alerts are scored against the simulator's ground
+truth. A naive engine sees the same frames with no band and no dwell.
+
+| | Rules | Naive |
+| --- | --- | --- |
+| Speeding alerts, false ones | 97, **0 false** | 843, **270 false** |
+| Real speeding (12 s or more) caught | 137 of 141 | 141 of 141 |
+| Real silences caught (over 2 min with ignition on, 10 min off) | **18 of 18**, 0 false | 18 of 18, 0 false |
+| Bridge entries (visits of 30 s or more) caught | 40 of 40, 0 false | 40 of 40, 0 false |
+| Zone edge through a parking spot: alerts for 154 real crossings | **154** | **1,036** |
+| Zone edge 5 m from the parking spot | 154 | 169 |
+| Speeding delay, p50 / p95 (data time) | 10.2 s / 16.7 s | 0.2 s / 0.7 s |
+| Bridge entry delay, p50 / p95 | 11.7 s / 12.2 s | 0.2 s / 0.6 s |
+
+On screen, add about 1.3 s of display delay (speeding p50 11.5 s, bridge
+13.0 s). The 4 speeding episodes the rules miss all peaked at 63 km/h or less,
+within the report noise of the limit: that's the trade-off chosen. At 5 m from
+the edge, Layer 4's smoothing does most of the work alone (169 against 154).
+The rules matter when the edge runs right through where trucks stand.
+
+**Measured: cost** (`pnpm --filter @fleet/alerts bench`)
+
+5,000 trucks, per evaluation (twice a second, in the Worker). These are
+medians of 5, and the range is across three runs on a noisy laptop.
+
+| Zones | Per evaluation |
+| --- | --- |
+| None | 0.9–1.5 ms |
+| The 2 presets | 1.3–2.6 ms |
+| 10 zones | 2.5–4.4 ms |
+| 1 zone of 5,000 vertices round Apapa | 1.2–1.8 ms (34.5 ms before the edge grid) |
+
+**Measured: the page** (Chrome, the real Intel GPU, the built app)
+
+- **`smoke:alerts` 17/17. `smoke:ui` 18/18. `smoke:web`:** 60 fps, and context
+  loss recovered.
+- **`a11y`: 0 violations** in 11 states. That includes the Alerts and Zones
+  tabs, in light and dark.
+- **`a11y:contrast`: 0 failures** across about 1,900 text elements and control
+  borders. All three tabs were checked, in both schemes, on desktop and phone.
+- **Frames, against the 8a build under the same conditions.** Both builds ran
+  side by side, alternately, three traces each: 8a dropped 2–14 frames in 10 s,
+  and 8b dropped 1–8, both at 60 fps with a p99 around 16.9 ms. There's no
+  measurable cost.
+  - The 1–3 recorded for 8a earlier came from a quieter machine. This time a
+    browser on the same laptop also had the app open.
+
+**Found while building**
+
+1. **The sim couldn't produce the events.** Truck speed was capped at 55 km/h,
+   and silences only happened in coverage gaps, which send their backlog
+   later. So I added speeders and power loss, each on a new random stream. A
+   before/after run of 2,000 trucks showed no careful driver's position
+   changed. With network chaos off, only the 14 trucks that lost power or sped
+   sent different numbers of pings. With chaos on, every truck's drops
+   reshuffle, because one chaos stream serves every ping. The code comment says
+   exactly that, rather than "nothing changed".
+2. **My first scoring was wrong, twice.** It counted episodes already under
+   way when measuring began, which made even the naive engine miss things. It
+   then counted a truck that dipped under the limit for a moment, while its
+   alert stayed active, as "missed". Scoring now uses "an alert was active
+   during the episode" and only episodes that begin after warm-up.
+3. **Offline used the wrong signal.** 4 of 18 silences were missed by both
+   engines. All four trucks were stopped in traffic, engine running, when their
+   trackers died. The feed calls a stopped truck "parked", so the engine
+   waited 10 minutes. The snapshot now carries the ignition flag, and it's
+   18 of 18.
+4. **The geometry didn't scale to its own limit.** The benchmark put a zone at
+   the importer's 5,000-vertex maximum round Apapa: 34.5 ms per evaluation.
+   The edge grid made it 1.2–1.8 ms. Inlining the bounding-box rejection
+   brought 10 zones from about 4.5 to 2.5–4.4 ms.
+5. **The alert list moved under the pointer.** New alerts go on top, which
+   pushed every row down, and the browser check's click landed on a different
+   alert's button. While the pointer is over the list or focus is in it, the
+   order now freezes. New alerts wait behind a "Show N new" button in the
+   header, which doesn't move the rows.
+6. **The skip link led nowhere off the Trucks tab.** It pointed at the search
+   box, which only that tab has. axe reported it as two problems, a broken
+   skip link and "content outside landmarks", because a broken skip link is
+   counted as loose content. It now goes to the side panel. The phone sheet
+   became an `<aside>`, like the desktop panel, and the Zones tab got a
+   heading so its outline is in order.
+7. **A new Set every message re-rendered the truck list.** Alert messages
+   arrive up to twice a second. A zone count moving is enough. The set of
+   alerting trucks is now the same object until its members change, and the
+   list is memoised.
+8. **Flaky checks, fixed in the checks.**
+   - The follow check used whichever truck was first, sometimes a parked one;
+     it now picks a moving one.
+   - The alert check re-found "the first row" for each click, and new alerts
+     arrived in between; it now pins one alert by id.
+   - The drawer check compared a speeding alert's text while its peak speed was
+     still rising.
+   - The browser checks' server, started as a detached shell child, kept dying
+     quietly. It now runs as a managed background task.
+
+**Not done here**
+
+- The manual NVDA pass (steps 21–30 were added to
+  `docs/a11y/NVDA-CHECKLIST.md`) is for a person to run.
+- Acknowledgements aren't persisted across reloads. In demo mode the fleet
+  itself restarts on reload, so they would point at alerts that no longer
+  exist.
+- Real GPS multipath jumps aren't modelled, so the dwell's defence against
+  them isn't measured (ADR 0012).
+
+**Run it** (with the built app on port 3100):
+
+- `pnpm --filter @fleet/alerts evaluate` (about 10 minutes)
+- `pnpm --filter @fleet/alerts bench`
+- `pnpm smoke:alerts`
+- `pnpm smoke:ui`
+- `pnpm a11y`
+- `pnpm a11y:contrast`

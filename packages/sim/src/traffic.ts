@@ -101,8 +101,9 @@ export function targetSpeed(
   epochMs: number,
   zone: CongestionZone | undefined,
   driverFactor: number,
+  capMs: number = TRUCK_MAX_SPEED_MS,
 ): number {
   const wanted = freeFlowMs * timeOfDayFactor(lagosHour(epochMs)) * (zone?.factor ?? 1) * driverFactor;
   // The cap applies last, so a heavy-footed driver (factor > 1) still can't exceed it.
-  return Math.min(wanted, TRUCK_MAX_SPEED_MS);
+  return Math.min(wanted, capMs);
 }

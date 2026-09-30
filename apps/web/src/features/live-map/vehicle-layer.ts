@@ -14,6 +14,8 @@ export interface VehicleLayerStats {
   layersAdded: number;
   /** Frames skipped because the layer had nothing to draw yet (for diagnosing a blank layer). */
   skipped: number;
+  /** Trucks drawn as alert diamonds in the last frame. */
+  alerting: number;
 }
 
 /** Icon size in CSS pixels by zoom: dots when the whole metro is in view, arrows when zoomed in. */
@@ -25,6 +27,7 @@ function iconSize(zoom: number): number {
 
 const UNIFORMS = [
   "u_samples",
+  "u_alerts",
   "u_matrix",
   "u_time",
   "u_viewport",
@@ -68,6 +71,8 @@ export class VehicleLayer implements CustomLayerInterface {
   private vao: WebGLVertexArrayObject | undefined;
   private buffer: WebGLBuffer | undefined;
   private texture: WebGLTexture | undefined;
+  private alertTexture: WebGLTexture | undefined;
+  private alertVersion = -1;
   private uniforms: Partial<Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>> = {};
   private uploadedHeight = 0;
   private readonly matrix = new Float32Array(16);
@@ -112,6 +117,7 @@ export class VehicleLayer implements CustomLayerInterface {
       gl.deleteVertexArray(this.vao ?? null);
       gl.deleteBuffer(this.buffer ?? null);
       gl.deleteTexture(this.texture ?? null);
+      gl.deleteTexture(this.alertTexture ?? null);
     }
     this.program = undefined;
   }
@@ -140,6 +146,14 @@ export class VehicleLayer implements CustomLayerInterface {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     this.uploadedHeight = 0;
     this.state.mirror.dirty = true;
+
+    this.alertTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.alertTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.alertVersion = -1;
   }
 
   render(gl: WebGLRenderingContext | WebGL2RenderingContext, args: CustomRenderMethodInput): void {
@@ -174,9 +188,22 @@ export class VehicleLayer implements CustomLayerInterface {
       this.stats.uploads++;
     }
 
+    // The alert flags: a second, tiny texture (one byte per truck), uploaded only when alerts change.
+    const alerts = this.state.alertTexture();
+    g.activeTexture(g.TEXTURE1);
+    g.bindTexture(g.TEXTURE_2D, this.alertTexture ?? null);
+    if (alerts.version !== this.alertVersion) {
+      g.pixelStorei(g.UNPACK_ALIGNMENT, 1);
+      g.texImage2D(g.TEXTURE_2D, 0, g.R8, alerts.width, alerts.height, 0, g.RED, g.UNSIGNED_BYTE, alerts.data);
+      g.pixelStorei(g.UNPACK_ALIGNMENT, 4);
+      this.alertVersion = alerts.version;
+    }
+    g.activeTexture(g.TEXTURE0);
+
     const u = this.uniforms;
     g.useProgram(this.program);
     g.uniform1i(u.u_samples!, 0);
+    g.uniform1i(u.u_alerts!, 1);
     g.uniformMatrix4fv(u.u_matrix!, false, rtcMatrix(args.defaultProjectionData.mainMatrix, this.matrix));
     g.uniform1f(u.u_time!, (display - epoch) / 1000);
     g.uniform2f(u.u_viewport!, g.drawingBufferWidth, g.drawingBufferHeight);
@@ -195,17 +222,23 @@ export class VehicleLayer implements CustomLayerInterface {
     g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA); // premultiplied alpha, as MapLibre blends
     g.disable(g.DEPTH_TEST);
     g.bindVertexArray(this.vao ?? null);
-    // Two passes so the selected truck is always on top: WebGL2 has no base-instance draw,
-    // so the second pass runs every instance and the shader culls all but one immediately.
+    // Up to three passes, so alerting trucks sit above the rest and the selected truck above
+    // everything: WebGL2 has no base-instance draw, so each pass runs every instance and the
+    // shader culls the ones that aren't its own immediately.
     g.uniform1i(u.u_pass!, 0);
     g.drawArraysInstanced(g.TRIANGLE_STRIP, 0, 4, mirror.count);
-    if (this.state.selectedSlot >= 0) {
+    if (this.state.alertCount > 0) {
       g.uniform1i(u.u_pass!, 1);
+      g.drawArraysInstanced(g.TRIANGLE_STRIP, 0, 4, mirror.count);
+    }
+    if (this.state.selectedSlot >= 0) {
+      g.uniform1i(u.u_pass!, 2);
       g.drawArraysInstanced(g.TRIANGLE_STRIP, 0, 4, mirror.count);
     }
     g.bindVertexArray(null);
 
     this.stats.frames++;
+    this.stats.alerting = this.state.alertCount;
     this.stats.renderMs = performance.now() - start;
     // Keep animating: positions change every frame even when no new data arrives.
     if (!this.reducedMotion) map.triggerRepaint();

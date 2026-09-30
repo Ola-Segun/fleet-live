@@ -102,6 +102,31 @@ describe("a truck", () => {
     expect(all).toEqual(all.map((_, i) => i)); // nothing lost, nothing reordered, on the device's side
   });
 
+  it("records nothing while its tracker has no power, then reports again with the next seq", () => {
+    // About one outage every 10 s, each exactly 30 s long, so the first comes early.
+    const device: DeviceConfig = { ...QUIET_DEVICE, outagesPerHour: 360, outageMinMs: 30_000, outageMaxMs: 30_000 };
+    const network = straightNetwork();
+    const vehicle = new Vehicle({ id: 0, plate: "T", driver: "T" }, createRng(1), createRng(2), network, device, NIGHT, {
+      speedCapMs: 15,
+      power: createRng(3),
+    });
+    vehicle.path = network.paths[0]!;
+    vehicle.distanceAlong = 0;
+    const pings: Ping[] = [];
+    let sawOff = false;
+    for (let t = NIGHT + 100; t <= NIGHT + 60_000; t += 100) {
+      vehicle.drive(t, 100);
+      pings.push(...vehicle.report(t, []));
+      sawOff ||= vehicle.truth().deviceOff;
+    }
+    const gaps = pings.slice(1).map((p, i) => p.deviceTime - pings[i]!.deviceTime);
+    expect(sawOff).toBe(true);
+    expect(Math.max(...gaps)).toBeGreaterThanOrEqual(30_000);
+    expect(Math.max(...gaps)).toBeLessThan(31_500);
+    // Nothing was recorded during the outage, so no sequence numbers are missing: no backlog exists.
+    expect(pings.every((p, i) => p.seq === i)).toBe(true);
+  });
+
   it("stamps every report with the same wrong clock when the device's clock is off", () => {
     const { vehicle } = truckAtStart({ ...QUIET_DEVICE, skewedShare: 1, maxSkewMs: 180_000 });
     const skews: number[] = [];
@@ -199,6 +224,23 @@ describe("the simulation", () => {
   });
 
   // 2 runs × 150 trucks × 15 simulated minutes × 10 steps a second is 2.7 million truck-steps.
+  it("lets speeders past the 55 km/h laden-truck cap, up to their own, and nobody else", { timeout: 30_000 }, () => {
+    const fastest = (speederShare: number) => {
+      const sim = new Simulation(lagos, { seed: 5, vehicleCount: 200, startTime: NIGHT, chaos: NO_CHAOS, drivers: { speederShare } });
+      let max = 0;
+      for (let i = 0; i < 1500; i++) {
+        sim.advance(100);
+        for (let id = 0; id < 200; id++) max = Math.max(max, sim.truth(id).speed);
+      }
+      return max * 3.6;
+    };
+    const careful = fastest(0);
+    const speeders = fastest(1);
+    expect(careful).toBeLessThanOrEqual(55 + 1e-9);
+    expect(speeders).toBeGreaterThan(65);
+    expect(speeders).toBeLessThanOrEqual(80 + 1e-9);
+  });
+
   it("is slower at the morning peak than at night", { timeout: 30_000 }, () => {
     const medianMovingKmh = (start: number) => {
       const sim = new Simulation(lagos, { seed: 9, vehicleCount: 150, startTime: start, chaos: NO_CHAOS });

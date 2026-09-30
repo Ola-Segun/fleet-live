@@ -25,6 +25,8 @@ export interface FleetSnapshot {
   speed: Float32Array;
   mode: Uint8Array;
   ageMs: Float32Array;
+  /** 1 if the truck's newest report had the ignition on. */
+  ignition: Uint8Array;
 }
 
 export function buildSnapshot(feed: Feed): FleetSnapshot {
@@ -43,6 +45,7 @@ export function buildSnapshot(feed: Feed): FleetSnapshot {
     speed: new Float32Array(n),
     mode: new Uint8Array(n),
     ageMs: new Float32Array(n),
+    ignition: new Uint8Array(n),
   };
   ids.forEach((id, i) => {
     const e = feed.estimate(id, display);
@@ -53,11 +56,12 @@ export function buildSnapshot(feed: Feed): FleetSnapshot {
     snap.speed[i] = e.speed;
     snap.mode[i] = MODE_CODES[e.mode];
     snap.ageMs[i] = e.ageMs;
+    snap.ignition[i] = e.ignition ? 1 : 0;
   });
   return snap;
 }
 
 /** The buffers to list as transferables, so posting the snapshot copies nothing. */
 export function snapshotTransfer(s: FleetSnapshot): ArrayBuffer[] {
-  return [s.ids, s.lat, s.lon, s.heading, s.speed, s.mode, s.ageMs].map((a) => a.buffer as ArrayBuffer);
+  return [s.ids, s.lat, s.lon, s.heading, s.speed, s.mode, s.ageMs, s.ignition].map((a) => a.buffer as ArrayBuffer);
 }

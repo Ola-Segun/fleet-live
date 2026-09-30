@@ -269,8 +269,34 @@ describe("demo source and worker core", () => {
     const last = snapshots.at(-1)!;
     if (last.message.type !== "snapshot") throw new Error("unreachable");
     expect(last.message.snapshot.count).toBeGreaterThan(70);
-    expect(last.transfer).toHaveLength(7);
-    expect(new Set(last.transfer).size).toBe(7); // seven distinct buffers, nothing shared
+    expect(last.transfer).toHaveLength(8);
+    expect(new Set(last.transfer).size).toBe(8); // eight distinct buffers, nothing shared
+  });
+
+  it("evaluates alerts on each snapshot before transferring it, and answers the dispatcher at once", () => {
+    // Every driver a speeder, at 03:00 on empty roads: speeding alerts within the first minute.
+    const sim = new Simulation(lagos, { seed: 4, vehicleCount: 80, startTime: T0, drivers: { speederShare: 1 } });
+    const posted: WorkerToMain[] = [];
+    const core = new FleetCore(new DemoSource(sim), (message) => posted.push(message));
+    core.setZones([]);
+    expect(posted.at(-1)).toEqual({ type: "alerts", alerts: [], zoneCounts: [], raised: [] });
+    core.start();
+    vi.advanceTimersByTime(60_000);
+
+    const updates = posted.filter((m) => m.type === "alerts");
+    const last = updates.at(-1)!;
+    if (last.type !== "alerts") throw new Error("unreachable");
+    expect(last.alerts.filter((a) => a.kind === "speeding").length).toBeGreaterThan(0);
+    expect(updates.flatMap((m) => (m.type === "alerts" ? m.raised : [])).length).toBeGreaterThan(0);
+    expect(updates.length).toBeLessThanOrEqual(121); // one when zones were set, then at most one per snapshot
+
+    const id = last.alerts[0]!.id;
+    const before = posted.length;
+    core.actOnAlert("acknowledge", id);
+    core.stop();
+    expect(posted).toHaveLength(before + 1);
+    const answer = posted.at(-1)!;
+    expect(answer.type === "alerts" && answer.alerts.find((a) => a.id === id)?.acknowledgedAt).toBeGreaterThan(0);
   });
 });
 
@@ -314,11 +340,11 @@ describe("snapshot", () => {
     const ids = [...feed.vehicleIds()].sort((a, b) => a - b);
 
     expect(Array.from(snap.ids)).toEqual(ids);
-    for (const array of [snap.lat, snap.lon, snap.heading, snap.speed, snap.mode, snap.ageMs]) expect(array.length).toBe(ids.length);
+    for (const array of [snap.lat, snap.lon, snap.heading, snap.speed, snap.mode, snap.ageMs, snap.ignition]) expect(array.length).toBe(ids.length);
     const i = 3;
     const e = feed.estimate(ids[i]!, snap.displayTime)!;
     expect(snap.lat[i]).toBe(e.lat);
     expect(snap.mode[i]).toBe(MODE_CODES[e.mode]);
-    expect(snapshotTransfer(snap)).toHaveLength(7);
+    expect(snapshotTransfer(snap)).toHaveLength(8);
   });
 });

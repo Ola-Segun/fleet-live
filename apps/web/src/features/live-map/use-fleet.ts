@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VehicleInfo } from "@fleet/sim";
-import type { FleetSnapshot, RowsMessage, WorkerToMain } from "@fleet/transport";
+import type { AlertsMessage, FleetSnapshot, RowsMessage, WorkerToMain } from "@fleet/transport";
 import { FleetGpuState } from "@/lib/gpu-state";
 import type { FleetConfig, MainToWorker } from "@/lib/worker-messages";
 
@@ -24,6 +24,13 @@ export function useFleet(config: FleetConfig) {
   const [error, setError] = useState<string | null>(null);
   // Plate and driver by vehicle id. Arrives once; the map works with ids until then.
   const [vehicles, setVehicles] = useState<ReadonlyMap<number, VehicleInfo>>(() => new Map());
+  // Alerts are React state: a few hundred at most, changing at most twice a second, and rendered as a list.
+  const [alerts, setAlerts] = useState<AlertsMessage | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  // Sent before the Worker exists (zones load from storage on the first render): queued, then flushed.
+  const pending = useRef<MainToWorker[]>([]);
+  // The zone list is state the Worker must always have: replayed to every new Worker (a new seed or mode starts one).
+  const zones = useRef<MainToWorker | null>(null);
   const latest = useRef<FleetSnapshot | null>(null);
   const listeners = useRef(new Set<SnapshotListener>());
   const rowsListeners = useRef(new Set<RowsListener>());
@@ -45,6 +52,8 @@ export function useFleet(config: FleetConfig) {
         for (const listener of listeners.current) listener(message.snapshot);
       } else if (message.type === "vehicles") {
         setVehicles(new Map(message.vehicles.map((v) => [v.id, v])));
+      } else if (message.type === "alerts") {
+        setAlerts(message);
       } else if (message.type === "error") {
         setError(message.message);
       } else {
@@ -54,7 +63,12 @@ export function useFleet(config: FleetConfig) {
     worker.onerror = (event) => setError(event.message || "The fleet worker failed to start.");
     const start: MainToWorker = { type: "start", ...(JSON.parse(key) as FleetConfig) };
     worker.postMessage(start);
+    if (zones.current) worker.postMessage(zones.current);
+    for (const message of pending.current) if (message.type !== "zones") worker.postMessage(message);
+    pending.current = [];
+    workerRef.current = worker;
     return () => {
+      workerRef.current = null;
       worker.postMessage({ type: "stop" } satisfies MainToWorker);
       worker.terminate();
     };
@@ -75,5 +89,11 @@ export function useFleet(config: FleetConfig) {
     };
   }, []);
 
-  return { status, error, subscribe, subscribeRows, gpu, vehicles };
+  const send = useCallback((message: MainToWorker) => {
+    if (message.type === "zones") zones.current = message;
+    if (workerRef.current) workerRef.current.postMessage(message);
+    else pending.current.push(message);
+  }, []);
+
+  return { status, error, subscribe, subscribeRows, gpu, vehicles, alerts, send };
 }

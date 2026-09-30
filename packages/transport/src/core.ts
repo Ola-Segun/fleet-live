@@ -1,3 +1,4 @@
+import { AlertEngine, type Alert, type ZoneSpec } from "@fleet/alerts";
 import { Feed, type FeedStats } from "@fleet/feed";
 import { FLOATS_PER_VEHICLE, packVehicle } from "@fleet/gl";
 import type { VehicleInfo } from "@fleet/sim";
@@ -24,9 +25,23 @@ export interface RowsMessage {
   newIds: number[];
 }
 
+/**
+ * The open alerts, sent whenever they or the zone counts change (at most at the
+ * snapshot rate), and straight after the dispatcher acts on one. A few hundred
+ * small objects at most: cheap to clone, unlike the fleet snapshot.
+ */
+export interface AlertsMessage {
+  type: "alerts";
+  alerts: Alert[];
+  zoneCounts: Array<[zoneId: string, trucksInside: number]>;
+  /** Ids raised (or raised again) since the last message: what to announce. */
+  raised: number[];
+}
+
 /** Messages from the Worker to the page. */
 export type WorkerToMain =
   | { type: "status"; mode: FrameSource["mode"]; connection: ConnectionStatus; feed: FeedStats; delayMs: number }
+  | AlertsMessage
   | { type: "snapshot"; snapshot: FleetSnapshot }
   | { type: "vehicles"; vehicles: VehicleInfo[] }
   | { type: "error"; message: string }
@@ -39,12 +54,16 @@ export type Post = (message: WorkerToMain, transfer?: Transferable[]) => void;
  * timers: a status report and a snapshot `snapshotHz` times a second (for the
  * page's UI), and GPU rows `rowsHz` times a second (for the truck layer).
  *
+ * Alerts (Layer 8b) are evaluated on each snapshot, before it is posted: the
+ * snapshot's buffers are transferred, so after posting they are gone.
+ *
  * It takes `post` as a function rather than calling `self.postMessage`, so it
  * runs unchanged in a Node test. The Worker entry (Layer 6) is a few lines
  * that wire `self.postMessage` and `self.onmessage` to this.
  */
 export class FleetCore {
   readonly feed: Feed;
+  readonly alerts: AlertEngine;
   private timer: ReturnType<typeof setInterval> | undefined;
   private rowsTimer: ReturnType<typeof setInterval> | undefined;
   private readonly slots = new Map<number, number>();
@@ -56,8 +75,10 @@ export class FleetCore {
     private readonly snapshotHz = 2,
     feed?: Feed,
     private readonly rowsHz = 10,
+    alerts?: AlertEngine,
   ) {
     this.feed = feed ?? new Feed();
+    this.alerts = alerts ?? new AlertEngine();
   }
 
   start(): void {
@@ -88,7 +109,24 @@ export class FleetCore {
       delayMs: this.feed.delayMs,
     });
     const snapshot = buildSnapshot(this.feed);
+    if (snapshot.count > 0 && this.alerts.evaluate(snapshot)) this.publishAlerts();
     this.post({ type: "snapshot", snapshot }, snapshotTransfer(snapshot));
+  }
+
+  publishAlerts(): void {
+    this.post({ type: "alerts", alerts: this.alerts.alerts(), zoneCounts: this.alerts.zoneCounts(), raised: this.alerts.drainRaised().map((a) => a.id) });
+  }
+
+  setZones(zones: readonly ZoneSpec[]): void {
+    this.alerts.setZones(zones);
+    this.publishAlerts();
+  }
+
+  /** The dispatcher acted on an alert. Answered at once, not at the next snapshot, so the list responds to the click. */
+  actOnAlert(action: "acknowledge" | "resolve" | "resolve-cleared", id?: number): void {
+    if (action === "resolve-cleared") this.alerts.resolveCleared();
+    else if (id !== undefined) this.alerts[action](id);
+    this.publishAlerts();
   }
 
   /** Rows for the GPU: only the vehicles that changed since the last call. */

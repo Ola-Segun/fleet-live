@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { memo, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { ALL_GROUPS, type StatusGroup } from "@fleet/gl";
 import type { VehicleInfo } from "@fleet/sim";
 import type { FleetSnapshot } from "@fleet/transport";
@@ -19,6 +19,8 @@ interface Props {
   ui: UiState;
   onUi: (patch: Partial<UiState>) => void;
   onSelect: (id: number | undefined) => void;
+  /** Trucks with an active alert: shown first under "Needs attention", with a diamond. */
+  alerting: ReadonlySet<number>;
 }
 
 /**
@@ -29,8 +31,11 @@ interface Props {
  * The list re-renders at the snapshot rate (2 Hz), and only for the ~20 rows on
  * screen. Filters use the same status groups as the shader, so the list and
  * the map always agree.
+ *
+ * Memoised: alert messages re-render the app shell up to twice a second, and
+ * the list should re-render for its own snapshot, not for those.
  */
-export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
+export const FleetPanel = memo(function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect, alerting }: Props) {
   const [snapshot, setSnapshot] = useState<FleetSnapshot | null>(null);
   const [sort, setSort] = useState<SortKey>("status");
   // Keyboard focus follows a *truck*, not a row number. The default sort reorders live, twice a
@@ -57,15 +62,15 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
   const index = useMemo(() => indexVehicles(vehicles), [vehicles]);
   // Display order as snapshot indices; row objects are built only for what's on screen.
   const order = useMemo(
-    () => (snapshot ? buildOrder(snapshot, index, ui.query, ui.groups, sort) : new Int32Array(0)),
-    [snapshot, index, ui.query, ui.groups, sort],
+    () => (snapshot ? buildOrder(snapshot, index, ui.query, ui.groups, sort, alerting) : new Int32Array(0)),
+    [snapshot, index, ui.query, ui.groups, sort, alerting],
   );
   const rows = useMemo(
     () => ({
       length: order.length,
-      at: (k: number) => (snapshot && k >= 0 && k < order.length ? rowAt(snapshot, index, order[k]!) : undefined),
+      at: (k: number) => (snapshot && k >= 0 && k < order.length ? rowAt(snapshot, index, order[k]!, alerting) : undefined),
     }),
-    [order, snapshot, index],
+    [order, snapshot, index, alerting],
   );
   const counts = useMemo(() => (snapshot ? countGroups(snapshot) : { moving: 0, parked: 0, stale: 0 }), [snapshot]);
 
@@ -211,12 +216,13 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
                   selected ? "bg-selected" : index === activeIndex ? "bg-hover" : "hover:bg-hover"
                 }`}
               >
-                <StatusIcon mode={row.mode} />
+                <StatusIcon mode={row.mode} alert={row.alerting} />
                 <span className="w-24 shrink-0 font-mono font-medium">{row.plate}</span>
                 <span className="min-w-0 flex-1 truncate text-muted">{row.driver}</span>
                 <span className="w-24 shrink-0 text-right text-xs text-muted">
                   {/* The icon is decorative (aria-hidden) and moving rows show speed, so a screen reader
                       needs the status in words, or "moving" and "projected" would be sight-only. */}
+                  {row.alerting && <span className="sr-only">Alert, </span>}
                   {row.group === "moving" && <span className="sr-only">{MODE_LABEL[row.mode]}, </span>}
                   {row.group === "moving" ? `${Math.round(row.speedKmh)} km/h` : MODE_LABEL[row.mode]}
                 </span>
@@ -230,4 +236,4 @@ export function FleetPanel({ subscribe, vehicles, ui, onUi, onSelect }: Props) {
       </div>
     </section>
   );
-}
+});

@@ -71,12 +71,15 @@ const withStatus = moving.filter((n) => /Moving|No recent report/.test(n));
 console.log(`moving trucks' list options that say their status in words: ${withStatus.length} of ${moving.length}`);
 if (withStatus.length !== moving.length || moving.length === 0) failed = true;
 await desktop.getByRole("button", { name: /^Parked/ }).click();
+// Each page runs its own 5,000-truck simulation: close pages when done, or later ones starve.
+await desktop.context().close();
 
 const phone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })).newPage();
 await ready(phone, base);
-await phone.getByRole("button", { name: "Show trucks" }).tap();
+await phone.getByRole("button", { name: /^Show trucks/ }).tap();
 await phone.waitForSelector('[role="option"]');
 await scan(phone, "phone, sheet open");
+await phone.context().close();
 
 // The same states in dark mode. Checks that only ran in light mode missed near-white text on white panels.
 const darkDesktop = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" })).newPage();
@@ -86,10 +89,28 @@ await darkDesktop.getByRole("heading", { level: 2 }).waitFor();
 await scan(darkDesktop, "desktop, dark mode, a truck selected");
 const darkPhone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: "dark" })).newPage();
 await ready(darkPhone, base);
-await darkPhone.getByRole("button", { name: "Show trucks" }).tap();
+await darkPhone.getByRole("button", { name: /^Show trucks/ }).tap();
 await darkPhone.waitForSelector('[role="option"]');
 await scan(darkPhone, "phone, dark mode, sheet open");
 await darkDesktop.screenshot({ path: "scripts/a11y-dark-desktop.png" });
+await darkDesktop.context().close();
+await darkPhone.context().close();
+
+// Layer 8b: the Alerts and Zones tabs, with real alerts in them (the demo from 22:30, when speeders speed).
+for (const scheme of ["light", "dark"] as const) {
+  const p = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme })).newPage();
+  await ready(p, `${base}?at=2230`);
+  await p.waitForFunction(`[...document.querySelectorAll('[role="tab"]')].some((t) => /Alerts\\s*\\d+/.test(t.textContent))`, undefined, { timeout: 120_000 });
+  await p.getByRole("tab", { name: /^Alerts/ }).click();
+  await p.getByRole("list", { name: "Open alerts" }).waitFor();
+  await scan(p, `desktop, ${scheme}, Alerts tab with alerts`);
+  if (scheme === "light") writeFileSync("docs/a11y/aria-tree-alerts.txt", await p.locator("[role=tabpanel]").ariaSnapshot());
+  await p.getByRole("tab", { name: /^Zones/ }).click();
+  await p.getByRole("button", { name: "Draw a zone" }).click();
+  await scan(p, `desktop, ${scheme}, Zones tab while drawing`);
+  if (scheme === "light") await p.screenshot({ path: "scripts/a11y-zones.png" });
+  await p.context().close();
+}
 
 await browser.close();
 console.log(failed ? "\nviolations found" : "\nno violations");

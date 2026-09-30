@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { Feature, FeatureCollection } from "geojson";
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
+import { zonesToGeoJSON, type ZoneSpec } from "@fleet/alerts";
 import { slotEstimate } from "@fleet/gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { formatCamera, type Camera } from "@/lib/camera-url";
@@ -43,6 +45,61 @@ function ensureVehicleLayer(map: MapLibreMap, gpu: FleetGpuState, stats: Vehicle
   attempt();
 }
 
+/** A draft zone as it's drawn: the corners so far, and the outline closing back to the first. */
+function draftGeoJSON(corners: readonly (readonly [number, number])[]): FeatureCollection {
+  const features: Feature[] = corners.map((c) => ({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [...c] } }));
+  if (corners.length >= 2) {
+    const ring = corners.length >= 3 ? [...corners, corners[0]!] : corners;
+    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: ring.map((c) => [...c]) } });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+const ZONE_COLOUR = ["match", ["get", "kind"], "restricted", "#dc2626", "#2563eb"] as const;
+
+/**
+ * Zones and the draft outline, drawn with stock MapLibre layers: a handful of
+ * polygons that change only when someone edits them, which is exactly what
+ * GeoJSON sources are good at (unlike 5,000 moving trucks). They sit below the
+ * truck layer. A style swap drops them, like the truck layer, so this runs on
+ * every `style.load`.
+ *
+ * Restricted areas have a solid edge and depots a dashed one, so the kind
+ * isn't told by colour alone.
+ */
+function addZoneLayers(map: MapLibreMap, zones: readonly ZoneSpec[], draft: readonly (readonly [number, number])[], dark: boolean): void {
+  if (!map.getSource("zones")) map.addSource("zones", { type: "geojson", data: zonesToGeoJSON(zones) as FeatureCollection });
+  if (!map.getSource("zone-draft")) map.addSource("zone-draft", { type: "geojson", data: draftGeoJSON(draft) });
+  const before = map.getLayer("fleet-vehicles") ? "fleet-vehicles" : undefined;
+  const add = (layer: Parameters<MapLibreMap["addLayer"]>[0]) => {
+    if (!map.getLayer(layer.id)) map.addLayer(layer, before);
+  };
+  add({ id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": ZONE_COLOUR as never, "fill-opacity": dark ? 0.2 : 0.12 } });
+  add({ id: "zones-edge-restricted", type: "line", source: "zones", filter: ["==", ["get", "kind"], "restricted"], paint: { "line-color": "#dc2626", "line-width": 2 } });
+  add({
+    id: "zones-edge-depot",
+    type: "line",
+    source: "zones",
+    filter: ["==", ["get", "kind"], "depot"],
+    paint: { "line-color": dark ? "#60a5fa" : "#2563eb", "line-width": 2, "line-dasharray": [2, 1.5] },
+  });
+  add({
+    id: "zones-label",
+    type: "symbol",
+    source: "zones",
+    layout: { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12 },
+    paint: { "text-color": dark ? "#fafafa" : "#18181b", "text-halo-color": dark ? "#18181b" : "#ffffff", "text-halo-width": 1.5 },
+  });
+  add({ id: "zone-draft-line", type: "line", source: "zone-draft", paint: { "line-color": "#7c3aed", "line-width": 2, "line-dasharray": [1, 1] } });
+  add({
+    id: "zone-draft-corners",
+    type: "circle",
+    source: "zone-draft",
+    filter: ["==", ["geometry-type"], "Point"],
+    paint: { "circle-radius": 5, "circle-color": "#7c3aed", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 },
+  });
+}
+
 interface Props {
   initialCamera: Camera;
   subscribe: (listener: SnapshotListener) => () => void;
@@ -61,6 +118,14 @@ interface Props {
   onUserMove: () => void;
   /** The system's colour scheme: picks the basemap, and the selection ring's colour. */
   dark: boolean;
+  zones: readonly ZoneSpec[];
+  /** Corners of the zone being drawn ([lng, lat]), or null when not drawing. Clicks add corners instead of picking trucks. */
+  draft: readonly (readonly [number, number])[] | null;
+  onDraftCorner: (lngLat: [number, number]) => void;
+  /** The map's centre whenever it settles: "Add corner at map centre" uses it. */
+  onCentre: (lngLat: [number, number]) => void;
+  /** Fit the map to this zone. The token makes the same zone showable twice in a row. */
+  focusZone: { id: string; token: number } | null;
 }
 
 /** Pick radius, CSS px: about a fingertip, and the WCAG 2.2 minimum target size. */
@@ -94,15 +159,18 @@ function pickAt(map: MapLibreMap, gpu: FleetGpuState, point: { x: number; y: num
  * The base map and the truck layer: the WebGL layer by default, or the stock
  * GeoJSON baseline it replaced, kept so the two can be compared on the same page.
  */
-export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected, follow, onPick, onUserMove, dark }: Props) {
+export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected, follow, onPick, onUserMove, dark, zones, draft, onDraftCorner, onCentre, focusZone }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const statsRef = useRef<VehicleLayerStats | null>(null);
   const darkAtCreation = useRef(dark);
   // Latest callbacks in refs, so the map is created once and never re-created by a re-render.
-  const handlers = useRef({ onPick, onUserMove });
+  const handlers = useRef({ onPick, onUserMove, onDraftCorner, onCentre });
+  // Read by map events and style reloads, which outlive any one render.
+  const overlay = useRef({ zones, draft, dark });
   useEffect(() => {
-    handlers.current = { onPick, onUserMove };
+    handlers.current = { onPick, onUserMove, onDraftCorner, onCentre };
+    overlay.current = { zones, draft, dark };
   });
 
   useEffect(() => {
@@ -136,7 +204,23 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
       }, 1000);
     });
 
+    const reportCentre = () => {
+      const c = map.getCenter();
+      handlers.current.onCentre([c.lng, c.lat]);
+    };
+    map.on("load", reportCentre);
+    map.on("moveend", reportCentre);
+    // Zones go back on after every style load: the first, and each dark/light swap.
+    map.on("style.load", () => {
+      const { zones, draft, dark } = overlay.current;
+      addZoneLayers(map, zones, draft ?? [], dark);
+    });
+
     map.on("click", (e) => {
+      if (overlay.current.draft) {
+        handlers.current.onDraftCorner([e.lngLat.lng, e.lngLat.lat]);
+        return;
+      }
       const t0 = performance.now();
       const id = pickAt(map, gpu, e.point);
       perf.lastPickMs = performance.now() - t0;
@@ -151,7 +235,7 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
     map.on("load", () => {
       if (layer === "off") return;
       if (layer === "gl") {
-        const stats: VehicleLayerStats = { frames: 0, renderMs: 0, uploads: 0, contextRestores: 0, layersAdded: 1, skipped: 0 };
+        const stats: VehicleLayerStats = { frames: 0, renderMs: 0, uploads: 0, contextRestores: 0, layersAdded: 1, skipped: 0, alerting: 0 };
         perf.layer = stats;
         statsRef.current = stats;
         map.addLayer(new VehicleLayer(gpu, stats));
@@ -217,6 +301,34 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
     if (layer === "gl" && statsRef.current) ensureVehicleLayer(map, gpu, statsRef.current);
   }, [dark, gpu, layer]);
 
+  // Zones and the draft outline follow their props. Cheap: a few polygons, only when edited.
+  useEffect(() => {
+    (mapRef.current?.getSource("zones") as GeoJSONSource | undefined)?.setData(zonesToGeoJSON(zones) as FeatureCollection);
+  }, [zones]);
+  const drawing = draft !== null;
+  useEffect(() => {
+    const map = mapRef.current;
+    (map?.getSource("zone-draft") as GeoJSONSource | undefined)?.setData(draftGeoJSON(draft ?? []));
+  }, [draft]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // While drawing, a double click would zoom as well as add a corner.
+    if (drawing) map.doubleClickZoom.disable();
+    else map.doubleClickZoom.enable();
+    map.getCanvas().style.cursor = drawing ? "crosshair" : "";
+  }, [drawing]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const zone = focusZone && overlay.current.zones.find((z) => z.id === focusZone.id);
+    if (!map || !zone) return;
+    const bounds = new maplibregl.LngLatBounds();
+    for (const polygon of zone.coordinates) for (const [lng, lat] of polygon[0]!) bounds.extend([lng!, lat!]);
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: reduce ? 0 : 700 });
+  }, [focusZone]);
+
   // Selecting a truck from the list or search brings it into view, unless follow mode will.
   // It runs when the *selection* changes, never when follow changes: a drag switches follow off,
   // and flying back to the truck at that moment cancelled the drag (easeTo stops gestures) and
@@ -274,6 +386,12 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
   return (
     <div className="absolute inset-0">
       <div ref={container} className="h-full w-full" role="region" aria-label="Map of the fleet" />
+      {/* Drawing without a pointer: the corner "Add corner at map centre" will place. */}
+      {drawing && (
+        <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl leading-none text-[#7c3aed] [text-shadow:0_0_2px_#fff]">
+          +
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ precision highp sampler2D;
 layout(location = 0) in vec2 a_corner;   // quad corner in [-1, 1]
 
 uniform sampler2D u_samples;
+uniform sampler2D u_alerts;               // one byte per slot, laid out VEHICLES_PER_ROW wide: 1 = the truck has an active alert
 uniform mat4 u_matrix;                    // MapLibre's matrix with the RTC origin folded in (float64 on the CPU)
 uniform float u_time;                     // display time, seconds since the session epoch
 uniform vec2 u_viewport;                  // drawing buffer size, px
@@ -28,11 +29,12 @@ uniform float u_movingStale;
 uniform float u_parkedStale;
 uniform int u_modeMask;                   // bit per mode code: a clear bit hides the truck (status filter)
 uniform int u_selected;                   // the selected slot, or -1
-uniform int u_pass;                       // 0: every truck except the selected one; 1: only the selected one, drawn on top
+uniform int u_pass;                       // 0: ordinary trucks; 1: alerting trucks, above them; 2: the selected truck, on top
 
 out vec2 v_local;
 flat out int v_mode;
 flat out int v_selected;
+flat out int v_alert;
 
 const int SAMPLES = ${SAMPLES_PER_VEHICLE};
 const int TEXELS = ${TEXELS_PER_VEHICLE};
@@ -49,7 +51,9 @@ float lerpHeading(float a, float b, float u) {
 
 void main() {
   int slot = gl_InstanceID;
-  if ((u_pass == 1) != (slot == u_selected)) {  // not this pass's truck
+  bool alerting = texelFetch(u_alerts, ivec2(slot % PER_ROW, slot / PER_ROW), 0).r > 0.5;
+  int pass = slot == u_selected ? 2 : alerting ? 1 : 0;
+  if (pass != u_pass) {                    // not this pass's truck
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     return;
   }
@@ -104,14 +108,16 @@ void main() {
   vec4 clip = u_matrix * vec4(pos, 0.0, 1.0);
   // Rotate the icon so "up" points along the heading. Headings are clockwise from
   // north, screen y is up, and the map may itself be rotated by its bearing.
-  float angle = radians(heading) - u_bearing;
+  // An alerting truck's diamond stays upright on screen: it marks the truck, it doesn't point.
+  float angle = alerting && !selected ? 0.0 : radians(heading) - u_bearing;
   vec2 corner = vec2(a_corner.x * cos(angle) + a_corner.y * sin(angle), -a_corner.x * sin(angle) + a_corner.y * cos(angle));
-  float size = selected ? max(u_size, 12.0) * 1.9 : u_size;
+  float size = selected ? max(u_size, 12.0) * 1.9 : alerting ? max(u_size, 12.0) * 1.15 : u_size;
   clip.xy += corner * size / u_viewport * clip.w;  // size in px: 2·(size/2)/viewport in clip units
   gl_Position = clip;
   v_local = a_corner;
   v_mode = mode;
   v_selected = selected ? 1 : 0;
+  v_alert = alerting ? 1 : 0;
 }
 `;
 
@@ -122,6 +128,7 @@ precision highp int;
 in vec2 v_local;
 flat in int v_mode;
 flat in int v_selected;
+flat in int v_alert;
 uniform float u_detail;                   // 0 at low zoom: every truck a plain dot
 uniform float u_dark;                     // 1 on a dark basemap
 out vec4 outColor;
@@ -137,17 +144,22 @@ float arrow(vec2 p) {
   return max(max(edge, base), notch);
 }
 
+// A diamond: the alert shape, distinct from every status shape (arrow, dot, ring).
+float diamond(vec2 p, float r) { return (abs(p.x) + abs(p.y) - r) * 0.7071; }
+
 void main() {
   vec3 color;
   float d;
   bool outline = true;
   if (v_selected == 1) {
     // Selected: a dark ring around the truck's own shape, legible at any zoom.
-    float shape = (v_mode == ${MODE_CODES.parked} || v_mode == ${MODE_CODES.stale}) ? circle(v_local, 0.32) : arrow(v_local * 1.7);
+    float shape = v_alert == 1 ? diamond(v_local, 0.42) : (v_mode == ${MODE_CODES.parked} || v_mode == ${MODE_CODES.stale}) ? circle(v_local, 0.32) : arrow(v_local * 1.7);
     float ring = abs(circle(v_local, 0.8)) - 0.09;
     d = min(shape, ring);
     // Navy on a light map, near-white on a dark one: a dark ring on a dark map would vanish.
     color = mix(vec3(0.07, 0.09, 0.15), vec3(0.98, 0.98, 0.98), u_dark);
+  } else if (v_alert == 1) {
+    d = diamond(v_local, 0.85); color = vec3(0.49, 0.23, 0.93);  // alerting: violet diamond, at every zoom
   } else if (u_detail < 0.5) {
     d = circle(v_local, 0.8);
     color = v_mode == ${MODE_CODES.parked} ? vec3(0.42, 0.45, 0.50) : v_mode == ${MODE_CODES.stale} ? vec3(0.86, 0.15, 0.15) : vec3(0.15, 0.39, 0.92);

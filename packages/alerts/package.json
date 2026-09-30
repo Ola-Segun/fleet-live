@@ -1,0 +1,19 @@
+{
+  "name": "@fleet/alerts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "evaluate": "tsx scripts/evaluate.ts",
+    "bench": "tsx scripts/bench.ts"
+  },
+  "dependencies": {
+    "@fleet/gl": "workspace:*"
+  },
+  "devDependencies": {
+    "@fleet/feed": "workspace:*",
+    "@fleet/routes": "workspace:*",
+    "@fleet/sim": "workspace:*"
+  }
+}
