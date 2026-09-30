@@ -38,7 +38,10 @@ await page.locator("body").click({ position: { x: 5, y: 5 } }); // focus the pag
 await page.keyboard.press("/");
 check('"/" focuses search', await page.evaluate("document.activeElement?.id === 'fleet-search'"));
 
-const firstPlate = (await page.locator('[role="option"] .font-mono').first().innerText()).trim();
+// A moving truck, so the follow check below has a camera that should move. Which truck is first
+// depends on the simulated time of day; a parked one made that check fail by chance.
+const movingRow = page.locator('[role="option"]', { hasText: /\b[1-9]\d km\/h/ }).first();
+const firstPlate = (await movingRow.locator(".font-mono").innerText()).trim();
 const partial = firstPlate.slice(0, 6).toLowerCase().replace("-", ""); // e.g. "kja48", however it's typed
 await page.keyboard.type(partial);
 await sleep(700);
@@ -66,7 +69,8 @@ const followOn = (await page.getByRole("button", { name: /Following/ }).getAttri
 const c1 = param(page, "c");
 await sleep(4000);
 const c2 = param(page, "c");
-check("F turns on follow, and the camera moves with the truck", followOn && param(page, "f") === "1" && c1 !== c2, `${c1} → ${c2}`);
+const followedStatus = (await page.locator("section[aria-labelledby=drawer-title] dd").first().innerText()).trim();
+check("F turns on follow, and the camera moves with the truck", followOn && param(page, "f") === "1" && c1 !== c2, `${c1} → ${c2}, truck ${followedStatus}`);
 await page.screenshot({ path: "scripts/smoke-ui-follow.png" });
 
 // A drag by the person hands control back.
@@ -168,10 +172,10 @@ await phone.goto(base);
 await phone.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: 40_000 });
 const mapBox = await phone.locator(".maplibregl-map").boundingBox();
 check("phone: the map fills the width", mapBox !== null && mapBox.width >= 389);
-await phone.getByRole("button", { name: "Show trucks" }).tap();
+await phone.getByRole("button", { name: /^Show trucks/ }).tap();
 await phone.waitForSelector('[role="option"]', { timeout: 10_000 });
 check("phone: the sheet opens with search and the list, and only one of each exists", (await phone.locator("#fleet-search").count()) === 1 && (await phone.locator('[role="listbox"]').count()) === 1);
-const target = await phone.getByRole("button", { name: "Hide trucks" }).boundingBox();
+const target = await phone.getByRole("button", { name: "Hide panel" }).boundingBox();
 check("phone: the sheet toggle is a comfortable tap target", target !== null && target.height >= 44, `${target?.height} px tall`);
 await phone.screenshot({ path: "scripts/smoke-ui-phone.png" });
 

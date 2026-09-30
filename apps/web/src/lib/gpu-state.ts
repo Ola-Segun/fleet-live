@@ -1,4 +1,4 @@
-import { ALL_GROUPS, DisplayClock, SampleMirror, modeMask, slotEstimate, type StatusGroup } from "@fleet/gl";
+import { ALL_GROUPS, DisplayClock, SampleMirror, VEHICLES_PER_ROW, modeMask, slotEstimate, textureHeight, type StatusGroup } from "@fleet/gl";
 import type { RowsMessage } from "@fleet/transport";
 
 /**
@@ -33,6 +33,13 @@ export class FleetGpuState {
   /** Dark basemap: the selection ring is drawn light instead of navy, or it would vanish. */
   dark = false;
   rowsReceived = 0;
+  /** Vehicles with an active alert, drawn as diamonds above the rest. */
+  private alertIds: ReadonlySet<number> = new Set();
+  private alertBytes = new Uint8Array(0);
+  private alertsDirty = true;
+  /** Bumped whenever the alert texture's bytes change, so the layer uploads only then. */
+  alertVersion = 0;
+  alertCount = 0;
   /** Called after every update, so a mounted layer can ask for a repaint. */
   onChange: (() => void) | undefined;
 
@@ -43,11 +50,14 @@ export class FleetGpuState {
       this.mirror.count = 0;
       this.slotIds.length = 0;
       this.slotOf.clear();
+      this.alertsDirty = true;
     }
     this.epoch = message.epoch;
     for (const id of message.newIds) {
       this.slotOf.set(id, this.slotIds.length);
       this.slotIds.push(id);
+      // An alert can arrive before the truck's first rows: mark it once it has a slot.
+      if (this.alertIds.has(id)) this.alertsDirty = true;
     }
     this.mirror.apply(message.slots, message.data, message.count);
     this.clock.report(message.serverTime, message.delayMs, localNow);
@@ -75,6 +85,39 @@ export class FleetGpuState {
     const slot = this.slotOf.get(vehicleId);
     if (slot === undefined || this.epoch === undefined || this.lastDisplay === undefined) return undefined;
     return slotEstimate(this.mirror.data, slot, (this.lastDisplay - this.epoch) / 1000);
+  }
+
+  setAlerting(ids: ReadonlySet<number>): void {
+    this.alertIds = ids;
+    this.alertsDirty = true;
+    this.onChange?.();
+  }
+
+  /**
+   * One byte per slot (255 = alerting), laid out like the sample texture's rows
+   * so the shader finds a slot the same way. Rebuilt only when alerts or slots
+   * changed: a few hundred ids against 5,000 slots, twice a second at most.
+   */
+  alertTexture(): { data: Uint8Array; width: number; height: number; version: number } {
+    const height = textureHeight(this.mirror.capacity);
+    if (this.alertBytes.length !== VEHICLES_PER_ROW * height) {
+      this.alertBytes = new Uint8Array(VEHICLES_PER_ROW * height);
+      this.alertsDirty = true;
+    }
+    if (this.alertsDirty) {
+      this.alertBytes.fill(0);
+      let n = 0;
+      for (const id of this.alertIds) {
+        const slot = this.slotOf.get(id);
+        if (slot === undefined) continue;
+        this.alertBytes[slot] = 255;
+        n++;
+      }
+      this.alertCount = n;
+      this.alertsDirty = false;
+      this.alertVersion++;
+    }
+    return { data: this.alertBytes, width: VEHICLES_PER_ROW, height, version: this.alertVersion };
   }
 
   setDark(dark: boolean): void {

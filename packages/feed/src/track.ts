@@ -51,6 +51,12 @@ export interface Estimate {
   mode: EstimateMode;
   /** Display time minus the newest sample's time. Negative while interpolating. */
   ageMs: number;
+  /**
+   * The newest report had the ignition on. Not the same as moving: a truck
+   * stopped in traffic has its engine running, and its tracker keeps
+   * reporting at the moving rate (Layer 8b's offline rule depends on this).
+   */
+  ignition: boolean;
 }
 
 export interface TrackOptions {
@@ -228,7 +234,7 @@ export class VehicleTrack {
     const age = displayTime - last.time;
 
     if (displayTime < first.time) {
-      return { lat: first.smoothLat, lon: first.smoothLon, heading: first.heading, speed: first.speed, mode: "waiting", ageMs: age };
+      return { lat: first.smoothLat, lon: first.smoothLon, heading: first.heading, speed: first.speed, mode: "waiting", ageMs: age, ignition: (last.flags & PingFlag.Ignition) !== 0 };
     }
 
     if (displayTime < last.time) {
@@ -245,6 +251,7 @@ export class VehicleTrack {
         speed: a.speed + (b.speed - a.speed) * t,
         mode: "interpolated",
         ageMs: age,
+        ignition: (last.flags & PingFlag.Ignition) !== 0,
       };
     }
 
@@ -257,6 +264,7 @@ export class VehicleTrack {
         speed: last.speed,
         mode: age > this.options.parkedStaleMs ? "stale" : "parked",
         ageMs: age,
+        ignition: (last.flags & PingFlag.Ignition) !== 0,
       };
     }
 
@@ -270,6 +278,7 @@ export class VehicleTrack {
       speed: last.speed,
       mode: age > this.options.movingStaleMs ? "stale" : age > this.options.extrapolateMs ? "holding" : "extrapolated",
       ageMs: age,
+        ignition: (last.flags & PingFlag.Ignition) !== 0,
     };
   }
 }

@@ -32,6 +32,7 @@ describe("snapshot to GeoJSON", () => {
       speed: Float32Array.from([10, 0]),
       mode: Uint8Array.from([MODE_CODES.interpolated, MODE_CODES.parked]),
       ageMs: Float32Array.from([-300, 12_000]),
+      ignition: Uint8Array.from([1, 0]),
     };
     const geo = snapshotToGeoJSON(snapshot);
     expect(geo.features).toHaveLength(2);
@@ -55,6 +56,12 @@ describe("fleet config from the URL", () => {
   it("accepts a stress size and another seed, within bounds", () => {
     expect(read("n=20000&seed=abc")).toEqual({ mode: "demo", seed: "abc", vehicleCount: 20000 });
     for (const n of ["0", "-5", "20001", "1.5", "lots"]) expect(read(`n=${n}`).mode === "demo" && read(`n=${n}`)).toMatchObject({ vehicleCount: 5000 });
+  });
+
+  it("starts the simulated day at a given Lagos time, ignoring anything that isn't HHMM", () => {
+    expect(read("at=2230")).toMatchObject({ mode: "demo", startMinute: 22 * 60 + 30 });
+    expect(read("at=0005")).toMatchObject({ startMinute: 5 });
+    for (const bad of ["2400", "1260", "930", "22:30", "x"]) expect(read(`at=${bad}`)).not.toHaveProperty("startMinute");
   });
 
   it("switches to network mode only for a ws:// or wss:// URL", () => {

@@ -1,46 +1,50 @@
-- link "Skip to truck search":
-  - /url: "#fleet-search"
+- link "Skip to the side panel":
+  - /url: "#side-panel"
 - banner:
   - heading "Fleet Live" [level=1]
   - 'button "Single-key shortcuts: on" [pressed]'
-  - paragraph: Demo fleet Live Connection live 4,950 trucks as of 1.4 s ago
+  - paragraph: Demo fleet Live Connection live 4,953 trucks as of 1.3 s ago
 - complementary:
-  - region "Fleet":
-    - text: Search trucks by plate or driver
-    - searchbox "Search trucks by plate or driver"
-    - group "Show statuses":
-      - button "Moving 4,180" [pressed]
-      - button "Parked 770" [pressed]
-      - button "Stale 0" [pressed]
-    - text: 4,950 of 4,950 trucks 0 trucks shown Sort
-    - combobox "Sort":
-      - option "Needs attention" [selected]
-      - option "Plate"
-      - option "Speed"
-    - listbox "Trucks":
-      - option "AGL-126AA Sani Olawale Moving, projected, 13 km/h"
-      - option "AGL-138WR Sani Eze Moving, projected, 13 km/h"
-      - option "AGL-157VT Chinedu Mohammed Moving, projected, 13 km/h"
-      - option "AGL-213PN Tunde Nwankwo Moving, projected, 14 km/h"
-      - option "AGL-435ZR Abdullahi Onyeka Moving, projected, 14 km/h"
-      - option "AGL-654AR Chinedu Olawale Moving, projected, 13 km/h"
-      - option "AGL-718CT Chinedu Yakubu Moving, projected, 13 km/h"
-      - option "AGL-724XU Gbenga Chukwu Moving, projected, 14 km/h"
-      - option "AGL-773WW Aliyu Okonkwo Moving, projected, 13 km/h"
-      - option "AGL-845WV Abdullahi Afolabi Moving, projected, 14 km/h"
-      - option "AGL-885XZ Kunle Okafor Moving, projected, 14 km/h"
-      - option "APP-195QZ Ibrahim Onyeka Moving, projected, 13 km/h"
-      - option "APP-394TG Aliyu Ogunleye Moving, projected, 14 km/h"
-      - option "APP-478FP Segun Adebisi Moving, projected, 13 km/h"
-      - option "APP-545BM Abdullahi Nwankwo Moving, projected, 13 km/h"
-      - option "APP-574NH Chinedu Olawale Moving, projected, 15 km/h"
-      - option "APP-603BM Gbenga Onyeka Moving, projected, 14 km/h"
-      - option "APP-840HB Yusuf Afolabi Moving, projected, 15 km/h"
-      - option "BDG-197NF Femi Bello Moving, projected, 13 km/h"
-      - option "BDG-331ML Abdullahi Ogunleye Moving, projected, 4 km/h"
-      - option "BDG-364AA Segun Adeyemi Moving, projected, 12 km/h"
-      - option "BDG-710DV Kunle Balogun Moving, projected, 13 km/h"
-      - option "BDG-870TU Kunle Adeyemi Moving, projected, 13 km/h"
+  - tablist "Panel":
+    - tab "Trucks" [selected]
+    - tab "Alerts"
+    - tab "Zones"
+  - tabpanel "Trucks":
+    - region "Fleet":
+      - text: Search trucks by plate or driver
+      - searchbox "Search trucks by plate or driver"
+      - group "Show statuses":
+        - button "Moving 4,177" [pressed]
+        - button "Parked 776" [pressed]
+        - button "Stale 0" [pressed]
+      - text: 4,953 of 4,953 trucks 0 trucks shown Sort
+      - combobox "Sort":
+        - option "Needs attention" [selected]
+        - option "Plate"
+        - option "Speed"
+      - listbox "Trucks":
+        - option "IKD-340UA Yusuf Bello No recent report, 17 km/h"
+        - option "AGL-349GG Obinna Adeyemi Moving, projected, 30 km/h"
+        - option "AGL-385RF Chinedu Mohammed Moving, projected, 26 km/h"
+        - option "AGL-387WZ Ifeanyi Garba Moving, projected, 29 km/h"
+        - option "AGL-648BQ Tunde Okonkwo Moving, projected, 8 km/h"
+        - option "AGL-675SE Sani Afolabi Moving, projected, 29 km/h"
+        - option "AGL-895FN Chukwuma Mohammed Moving, projected, 29 km/h"
+        - option "APP-246FL Adebayo Eze Moving, projected, 27 km/h"
+        - option "APP-396EJ Musa Danjuma Moving, projected, 28 km/h"
+        - option "APP-461AE Adebayo Olawale Moving, projected, 29 km/h"
+        - option "APP-596NQ Bola Okafor Moving, projected, 28 km/h"
+        - option "APP-825FR Aliyu Garba Moving, projected, 2 km/h"
+        - option "APP-916TB Aliyu Nwosu Moving, projected, 27 km/h"
+        - option "APP-988HC Aliyu Bello Moving, projected, 23 km/h"
+        - option "BDG-252QK Abdullahi Nwankwo Moving, projected, 28 km/h"
+        - option "BDG-420WG Emeka Danjuma Moving, projected, 2 km/h"
+        - option "BDG-464YH Adebayo Abubakar Moving, projected, 26 km/h"
+        - option "BDG-575AK Femi Bello Moving, projected, 28 km/h"
+        - option "BDG-676JH Aliyu Mohammed Moving, projected, 28 km/h"
+        - option "BDG-809NN Bola Afolabi Moving, projected, 29 km/h"
+        - option "BDG-865HA Nnamdi Ogunleye Moving, projected, 30 km/h"
+        - option "BDG-900FT Uche Mohammed Moving, projected, 29 km/h"
 - main:
   - region "Map of the fleet":
     - region "Map"

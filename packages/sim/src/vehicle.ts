@@ -2,7 +2,7 @@ import { PingFlag, type Ping } from "@fleet/protocol";
 import type { LatLon } from "@fleet/routes";
 import { positionAt, type RoadNetwork, type RoutePath } from "./network";
 import type { Rng } from "./random";
-import { lagosHour, targetSpeed, timeOfDayFactor, withinRadius, zoneAt } from "./traffic";
+import { TRUCK_MAX_SPEED_MS, lagosHour, targetSpeed, timeOfDayFactor, withinRadius, zoneAt } from "./traffic";
 
 export type VehicleStatus = "moving" | "loading";
 
@@ -26,6 +26,14 @@ export interface DeviceConfig {
   parkedIntervalMs: number;
   gapZoneCount: number;
   gapZoneRadiusM: number;
+  /**
+   * Power losses per device per hour of simulated time (a loose connector, a
+   * tracker unplugged to hide a detour). The device records nothing while off,
+   * unlike a coverage gap, where it records and sends the backlog later.
+   */
+  outagesPerHour: number;
+  outageMinMs: number;
+  outageMaxMs: number;
 }
 
 export const DEFAULT_DEVICE: DeviceConfig = {
@@ -37,7 +45,32 @@ export const DEFAULT_DEVICE: DeviceConfig = {
   parkedIntervalMs: 30_000,
   gapZoneCount: 3,
   gapZoneRadiusM: 600,
+  outagesPerHour: 0.02,
+  outageMinMs: 60_000,
+  outageMaxMs: 8 * 60_000,
 };
+
+/** How the drivers behave, separate from the roads and the trackers. */
+export interface DriverConfig {
+  /** Share of drivers who ignore the laden-truck cap where the road allows it. */
+  speederShare: number;
+  speederCapMs: number;
+}
+
+export const DEFAULT_DRIVERS: DriverConfig = {
+  speederShare: 0.02,
+  speederCapMs: 80 / 3.6,
+};
+
+/**
+ * One truck's habits, drawn from its own streams (see Simulation). Optional, so
+ * a truck built without them drives carefully and its tracker never fails.
+ */
+export interface Habits {
+  speedCapMs: number;
+  /** Draws for this device's power losses. Absent means it never loses power. */
+  power?: Rng;
+}
 
 /** An area with no mobile coverage. Devices record while inside and send everything on the way out. */
 export interface GapZone {
@@ -54,6 +87,8 @@ export interface Truth {
   status: VehicleStatus;
   pathId: string;
   distanceAlong: number;
+  /** The tracker has lost power and is recording nothing. */
+  deviceOff: boolean;
 }
 
 const ACCEL_MS2 = 0.6;
@@ -94,6 +129,9 @@ export class Vehicle {
   private gapBuffer: Ping[] = [];
   private readonly clockSkewMs: number;
   private readonly driverFactor: number;
+  private offUntil = -Infinity;
+  private nextOutageAt = Infinity;
+  private lastReportAt = -Infinity;
 
   constructor(
     readonly info: VehicleInfo,
@@ -102,7 +140,9 @@ export class Vehicle {
     private readonly network: RoadNetwork,
     private readonly deviceConfig: DeviceConfig,
     start: number,
+    readonly habits: Habits = { speedCapMs: TRUCK_MAX_SPEED_MS },
   ) {
+    if (habits.power && deviceConfig.outagesPerHour > 0) this.nextOutageAt = start + this.untilNextOutage(habits.power);
     this.driverFactor = motion.range(0.9, 1.1);
     this.path = motion.pick(network.paths);
     this.distanceAlong = motion.range(0, this.path.length);
@@ -116,6 +156,11 @@ export class Vehicle {
     // A random phase, so 5,000 devices don't all report on the same millisecond.
     this.nextPingAt = start + device.range(0, deviceConfig.movingIntervalMs);
     this.place();
+  }
+
+  /** Exponential waiting time: outages arrive as a Poisson process at `outagesPerHour`. */
+  private untilNextOutage(power: Rng): number {
+    return (-Math.log(1 - power.next()) / this.deviceConfig.outagesPerHour) * 3_600_000;
   }
 
   private place(): void {
@@ -154,7 +199,7 @@ export class Vehicle {
       }
     }
 
-    const cruise = now < this.stopUntil ? 0 : targetSpeed(this.path.freeFlow[this.segment]!, now, zone, this.driverFactor);
+    const cruise = now < this.stopUntil ? 0 : targetSpeed(this.path.freeFlow[this.segment]!, now, zone, this.driverFactor, this.habits.speedCapMs);
     // Comfortable acceleration and braking towards the speed the road allows.
     this.speed = this.speed < cruise ? Math.min(cruise, this.speed + ACCEL_MS2 * dt) : Math.max(cruise, this.speed - DECEL_MS2 * dt);
     // Then a hard limit: never faster than can still stop at the destination,
@@ -177,6 +222,14 @@ export class Vehicle {
    * the whole backlog at once.
    */
   report(now: number, gapZones: readonly GapZone[]): Ping[] {
+    this.lastReportAt = now;
+    const power = this.habits.power;
+    if (power && now >= this.nextOutageAt) {
+      this.offUntil = now + power.range(this.deviceConfig.outageMinMs, this.deviceConfig.outageMaxMs);
+      this.nextOutageAt = this.offUntil + this.untilNextOutage(power);
+    }
+    // No power: nothing recorded, nothing sent. Reporting resumes on the normal schedule after.
+    if (now < this.offUntil) return [];
     if (now < this.nextPingAt) return [];
 
     const parked = this.status === "loading";
@@ -223,6 +276,7 @@ export class Vehicle {
       status: this.status,
       pathId: this.path.id,
       distanceAlong: this.distanceAlong,
+      deviceOff: this.lastReportAt < this.offUntil,
     };
   }
 }

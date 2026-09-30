@@ -20,6 +20,7 @@ function snapshot(rows: [id: number, mode: number, speedMs: number][]): FleetSna
     speed: Float32Array.from(rows.map((r) => r[2])),
     mode: Uint8Array.from(rows.map((r) => r[1])),
     ageMs: new Float32Array(n),
+    ignition: new Uint8Array(n),
   };
 }
 const vehicles: ReadonlyMap<number, VehicleInfo> = new Map(
@@ -56,6 +57,12 @@ describe("the fleet list", () => {
     expect(buildRows(fleet, vehicles, "", all, "plate").map((r) => r.plate)).toEqual(["APP-101AB", "EPE-777ZZ", "KJA-482XR", "LND-300KK"]);
     expect(buildRows(fleet, vehicles, "", all, "speed").map((r) => r.id)).toEqual([4, 1, 2, 3]);
     expect(buildRows(fleet, vehicles, "", all, "status").map((r) => r.id)).toEqual([3, 4, 1, 2]); // stale, projected, moving, parked
+    // A truck with an active alert needs attention before anything else, and its row says so.
+    const alerting = new Set([2]);
+    const rows = buildRows(fleet, vehicles, "", all, "status", alerting);
+    expect(rows.map((r) => r.id)).toEqual([2, 3, 4, 1]);
+    expect(rows.map((r) => r.alerting)).toEqual([true, false, false, false]);
+    expect(buildRows(fleet, vehicles, "", all, "plate", alerting).map((r) => r.id)).toEqual([2, 3, 1, 4]); // other sorts ignore alerts
   });
 
   it("shows a vehicle by id before its plate has arrived, and converts speed to km/h", () => {

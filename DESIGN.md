@@ -190,7 +190,7 @@ Each row becomes a GitHub issue with these acceptance criteria.
 | L4 | Fleet list | A virtualized, sortable list synced both ways with the map. It is the accessible route to everything the map shows |
 | L5 | Filter | Status, depot and speed. Filters **and the map camera** live in the URL, so a copied link reopens the same view |
 | L6 | Geofences | Draw a zone (depot, restricted area), or import GeoJSON. Enter and exit alerts use a **20 m margin and a 10 s dwell**, so GPS noise at the edge doesn't fire enter/exit/enter |
-| L7 | Alerts | Geofence breach, offline over 2 minutes, speeding. Acknowledge and resolve. New alerts are announced politely; vehicle movement never is |
+| L7 | Alerts | Geofence breach, offline over 2 minutes (10 with the ignition off: the tracker reports less often), speeding (over 60 km/h for 10 s, ending below 55). Acknowledge and resolve. New alerts are announced politely, gathered to at most one announcement every 5 s; vehicle movement never is. See ADR 0012 |
 | L8 | Connection truth | Live, reconnecting (with countdown) or offline indicator. Data freshness always visible |
 | L9 | Replay | Scrub the last hour. Play at 1× to 60×. The whole fleet rewinds through the same renderer |
 | L10 | Raw vs smoothed | Toggle an overlay of the raw pings to see the smoothing at work |
@@ -207,7 +207,7 @@ Each row becomes a GitHub issue with these acceptance criteria.
 | UI store | Panels, drawer, geofence edit mode, HUD toggle | Zustand, with immutable updates only |
 | Worker | Every vehicle sample, the spatial index, geofence state, alerts | Plain typed arrays |
 | GPU | Sample texture, instance buffer | WebGL2 |
-| Persisted | Geofences, acknowledged alerts, preferences | IndexedDB in demo mode, the API in network mode |
+| Persisted | Geofences and preferences | localStorage (Layer 8b: zones are a few KB, and the synchronous API suits useSyncExternalStore; IndexedDB added async loading states for nothing). Acknowledgements live in the Worker for the session: in demo mode the fleet itself restarts on reload, so they would refer to alerts that no longer exist. The API in network mode |
 
 Layouts:
 

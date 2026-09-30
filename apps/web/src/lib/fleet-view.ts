@@ -11,6 +11,8 @@ export interface FleetRow {
   speedKmh: number;
   /** Seconds since the truck's newest report, at the snapshot's display time. Negative while interpolating. */
   ageS: number;
+  /** The truck has an active alert (Layer 8b). */
+  alerting: boolean;
 }
 
 export type SortKey = "plate" | "speed" | "status";
@@ -60,6 +62,7 @@ export function indexVehicles(vehicles: ReadonlyMap<number, VehicleInfo>): Vehic
   };
 }
 
+const NO_ALERTS: ReadonlySet<number> = new Set();
 const INDEX_BITS = 2 ** 15; // up to 32,768 snapshot rows
 const RANK_BITS = 2 ** 15; // up to 32,768 plates
 
@@ -78,8 +81,17 @@ const RANK_BITS = 2 ** 15; // up to 32,768 plates
  *   primary × 2³⁰ + plateRank × 2¹⁵ + rowIndex,
  * and a Float64Array is sorted natively. The row index is read back from the
  * low bits. Row objects are then built only for the rows on screen.
+ *
+ * "Needs attention" puts trucks with an active alert first, then by status.
  */
-export function buildOrder(snapshot: FleetSnapshot, index: VehicleIndex, query: string, groups: readonly StatusGroup[], sort: SortKey): Int32Array {
+export function buildOrder(
+  snapshot: FleetSnapshot,
+  index: VehicleIndex,
+  query: string,
+  groups: readonly StatusGroup[],
+  sort: SortKey,
+  alerting: ReadonlySet<number> = NO_ALERTS,
+): Int32Array {
   if (snapshot.count > INDEX_BITS || index.rank.size >= RANK_BITS) {
     throw new RangeError(`the list's sort keys hold at most ${INDEX_BITS - 1} trucks; this fleet has ${snapshot.count}`);
   }
@@ -94,7 +106,13 @@ export function buildOrder(snapshot: FleetSnapshot, index: VehicleIndex, query: 
     if (group !== undefined && !groups.includes(group)) continue;
     const rank = index.rank.get(id) ?? RANK_BITS - 1; // unknown plates (not arrived yet) sort last
     const primary =
-      sort === "plate" ? 0 : sort === "speed" ? Math.round(Math.max(0, 1000 - snapshot.speed[i]! * 3.6) * 100) : (STATUS_ORDER[mode] ?? 9);
+      sort === "plate"
+        ? 0
+        : sort === "speed"
+          ? Math.round(Math.max(0, 1000 - snapshot.speed[i]! * 3.6) * 100)
+          : alerting.has(id)
+            ? 0
+            : 1 + (STATUS_ORDER[mode] ?? 9);
     keys[n++] = (primary * RANK_BITS + rank) * INDEX_BITS + i;
   }
   const sorted = keys.subarray(0, n).sort();
@@ -104,7 +122,7 @@ export function buildOrder(snapshot: FleetSnapshot, index: VehicleIndex, query: 
 }
 
 /** One row, built only when it's about to be on screen. */
-export function rowAt(snapshot: FleetSnapshot, index: VehicleIndex, i: number): FleetRow {
+export function rowAt(snapshot: FleetSnapshot, index: VehicleIndex, i: number, alerting: ReadonlySet<number> = NO_ALERTS): FleetRow {
   const id = snapshot.ids[i]!;
   const mode = snapshot.mode[i]!;
   return {
@@ -115,6 +133,7 @@ export function rowAt(snapshot: FleetSnapshot, index: VehicleIndex, i: number): 
     group: groupOf(mode),
     speedKmh: snapshot.speed[i]! * 3.6,
     ageS: snapshot.ageMs[i]! / 1000,
+    alerting: alerting.has(id),
   };
 }
 
@@ -125,9 +144,10 @@ export function buildRows(
   query: string,
   groups: readonly StatusGroup[],
   sort: SortKey,
+  alerting: ReadonlySet<number> = NO_ALERTS,
 ): FleetRow[] {
   const index = indexVehicles(vehicles);
-  return Array.from(buildOrder(snapshot, index, query, groups, sort), (i) => rowAt(snapshot, index, i));
+  return Array.from(buildOrder(snapshot, index, query, groups, sort, alerting), (i) => rowAt(snapshot, index, i, alerting));
 }
 
 /** How many trucks are in each status group: the numbers on the filter buttons. */

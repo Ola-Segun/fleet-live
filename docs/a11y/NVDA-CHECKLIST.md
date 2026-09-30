@@ -33,8 +33,8 @@ Tester ______
 | 1 | Load the page, wait 5 s, then press NVDA+F7 → Landmarks | Landmarks: banner, complementary, main; regions "Fleet" and "Map of the fleet" | | |
 | 2 | Listen for 30 s without touching anything | "Connection live" **once**, then **silence**. Anything read repeatedly (counts, "as of…") is a failure | | |
 | 3 | Press H | "Fleet Live, heading level 1" | | |
-| 4 | Ctrl+Home, then Tab once | "Skip to truck search, link" | | |
-| 5 | Press Enter | "Search trucks by plate or driver, edit, search" (focus mode) | | |
+| 4 | Ctrl+Home, then Tab once | "Skip to the side panel, link" | | |
+| 5 | Press Enter, then Tab twice | "Trucks, tab, selected", then "Search trucks by plate or driver, edit, search" (focus mode) | | |
 | 6 | Type `kja`, then pause 1 s | After the pause: "*N* trucks shown" | | |
 | 7 | Press Enter | "*plate* selected, Moving." (or its status). The details panel opens | | |
 | 8 | Press Escape, then Tab until the list | "Trucks, list box". The first truck is read with plate, driver, **status in words** and speed, and "1 of *N*" | | |
@@ -51,12 +51,30 @@ Tester ______
 | 19 | Tab to "Single-key shortcuts: on", press Space | "Single-key shortcuts: off, toggle button, not pressed" | | |
 | 20 | Tab into the map region | "Map of the fleet, region", then the zoom buttons. The canvas itself isn't navigable: the list is the accessible way to the trucks | | |
 
+### Alerts and zones (Layer 8b)
+
+Open <http://127.0.0.1:3100/?at=2230>. The demo then starts at 22:30 Lagos
+time, when speeding happens, so alerts arrive within a minute.
+
+| # | Do this | NVDA should say (roughly) | What it said | OK? |
+| --- | --- | --- | --- | --- |
+| 21 | Wait up to a minute without touching anything | "Alert: *plate* speeding, up to *N* km/h." or "*N* new alerts. Latest: …". At most one such sentence every 5 seconds, never a stream | | |
+| 22 | Tab to the tab bar; press Right arrow | "Alerts, *N* new, tab, selected, 2 of 3" | | |
+| 23 | Tab into the panel | "*N* open: *a* active, *e* ended", then "Show truck, button", described by the alert's sentence | | |
+| 24 | Tab to "Acknowledge", press Enter | The button disappears; the status line now ends "acknowledged". **The list must not reorder under you** while focus is in it | | |
+| 25 | Tab to "Resolve", press Enter | Focus lands on the next alert's "Show truck", **not** the top of the page | | |
+| 26 | Press Enter on "Show truck" | The truck's details open with an "Alerts" heading and the same sentence | | |
+| 27 | Tab to the tab bar, press Right arrow to Zones | "Zones, tab, selected, 3 of 3"; each zone is a heading followed by "*N* trucks inside" | | |
+| 28 | Activate "Draw a zone", then "Add corner at map centre" three times, moving the map with the arrow keys between them | "*N* corners so far" updates; "Finish shape" becomes available at 3 | | |
+| 29 | Activate "Finish shape" | Focus goes to "Zone name, edit". Type a name, Tab, choose a kind, activate "Save zone" | | |
+| 30 | Paste `{nope` into "Import GeoJSON", activate "Import pasted" | "That isn't valid JSON." read out without moving focus | | |
+
 ## What to do with the results
 
 - **Every "OK" is ticked:** write "manual NVDA pass: done (date)" in
-  `docs/LAYERS.md` under Layer 8a, with the versions tested.
+  `docs/LAYERS.md` under Layers 8a and 8b, with the versions tested.
 - **Something is wrong:** open an issue quoting what NVDA said, and fix it
-  before the Layer 10 release. Items 2, 10 and 15 are the ones automated checks
-  approximate but can't prove.
+  before the Layer 10 release. Items 2, 10, 15, 21, 24 and 25 are the ones
+  automated checks approximate but can't prove.
 - **Known limitation, not a failure:** trucks can't be explored on the map by
   screen reader. The list is the equivalent, per the design (§8).

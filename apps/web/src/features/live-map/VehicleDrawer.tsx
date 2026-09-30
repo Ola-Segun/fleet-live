@@ -1,9 +1,12 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
+import type { Alert } from "@fleet/alerts";
 import type { VehicleInfo } from "@fleet/sim";
 import type { FleetSnapshot } from "@fleet/transport";
+import { alertStatus, alertText, type AlertNames } from "@/lib/alert-text";
 import { MODE_LABEL } from "@/lib/fleet-view";
+import type { AlertAction } from "./AlertsPanel";
 import { StatusIcon } from "./StatusIcon";
 import type { SnapshotListener } from "./use-fleet";
 
@@ -31,10 +34,14 @@ interface Props {
   follow: boolean;
   onFollow: (follow: boolean) => void;
   onClose: () => void;
+  /** This truck's open alerts: the drawer's "alerting" state. */
+  alerts: readonly Alert[];
+  names: AlertNames;
+  onAct: (action: AlertAction, id?: number) => void;
 }
 
 /** One truck: who's driving, what it's doing, how fresh the data is, and a follow switch. */
-export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, onClose }: Props) {
+export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, onClose, alerts, names, onAct }: Props) {
   const [snapshot, setSnapshot] = useState<FleetSnapshot | null>(null);
   useEffect(() => subscribe((s) => startTransition(() => setSnapshot(s))), [subscribe]);
 
@@ -81,6 +88,42 @@ export function VehicleDrawer({ vehicleId, info, subscribe, follow, onFollow, on
           <dt className="text-muted">Last report</dt>
           <dd className="tabular-nums">{age === undefined ? "–" : age < 1 ? "just now" : `${Math.round(age)} s ago`}</dd>
         </dl>
+      )}
+
+      {alerts.length > 0 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <h3 className="text-sm font-medium">Alerts</h3>
+          <ul className="mt-1 space-y-2">
+            {alerts.map((a) => (
+              <li key={a.id} className={`border-l-4 pl-2 ${a.active ? "border-l-danger" : "border-l-line"}`}>
+                <p id={`drawer-alert-${a.id}`} className="text-sm">
+                  {alertText(a, names)}
+                </p>
+                <p className="text-xs text-muted">{alertStatus(a)}</p>
+                <div className="mt-1 flex gap-1.5">
+                  {a.acknowledgedAt === undefined && (
+                    <button
+                      type="button"
+                      aria-describedby={`drawer-alert-${a.id}`}
+                      onClick={() => onAct("acknowledge", a.id)}
+                      className="min-h-8 rounded-md border border-control px-2 text-xs focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Acknowledge
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-describedby={`drawer-alert-${a.id}`}
+                    onClick={() => onAct("resolve", a.id)}
+                    className="min-h-8 rounded-md border border-control px-2 text-xs focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    Resolve
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <button

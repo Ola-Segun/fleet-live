@@ -3,13 +3,19 @@
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Alert } from "@fleet/alerts";
+import { announcement as alertAnnouncement, type AlertNames } from "@/lib/alert-text";
+import { useZones } from "@/lib/zones";
 import { DEFAULT_CAMERA, parseCamera } from "@/lib/camera-url";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { MODE_LABEL } from "@/lib/fleet-view";
 import { parseUi, writeUi, type UiState } from "@/lib/ui-url";
 import { setShortcutsOn, useShortcutsOn } from "@/lib/shortcuts-setting";
 import { configFromSearch } from "@/lib/worker-messages";
+import { AlertsPanel, type AlertAction } from "./AlertsPanel";
 import { FleetPanel } from "./FleetPanel";
+import { PanelTabs, type PanelTab } from "./PanelTabs";
+import { ZonesPanel, type DrawState } from "./ZonesPanel";
 import type { TruckLayerKind } from "./LiveMap";
 import { PerfHud } from "./PerfHud";
 import { StatusBar } from "./StatusBar";
@@ -30,6 +36,10 @@ const isTyping = (target: EventTarget | null) =>
     target.tagName === "TEXTAREA" ||
     target.isContentEditable);
 
+/** At most one alert announcement this often: more are gathered into the next one. */
+const ANNOUNCE_EVERY_MS = 5000;
+const NO_ALERTS: readonly Alert[] = [];
+
 export function FleetApp() {
   const params = useSearchParams();
   // Read once: afterwards the map owns the camera and this component owns the view, and both write back to the URL.
@@ -38,7 +48,13 @@ export function FleetApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const config = useMemo(() => configFromSearch(new URLSearchParams(params.toString())), []);
   const [ui, setUi] = useState<UiState>(() => parseUi(new URLSearchParams(params.toString())));
-  const { status, error, subscribe, gpu, vehicles } = useFleet(config);
+  const { status, error, subscribe, gpu, vehicles, alerts: alertsMessage, send } = useFleet(config);
+  const zones = useZones();
+  const [tab, setTab] = useState<PanelTab>("trucks");
+  const [draft, setDraft] = useState<[number, number][] | null>(null);
+  const [draw, setDraw] = useState<DrawState>({ step: "idle" });
+  const [focusZone, setFocusZone] = useState<{ id: string; token: number } | null>(null);
+  const centre = useRef<[number, number] | null>(null);
   const layer: TruckLayerKind =
     params.get("trucks") === "off" ? "off" : params.get("layer") === "baseline" ? "baseline" : "gl";
   const [announcement, setAnnouncement] = useState("");
@@ -76,6 +92,78 @@ export function FleetApp() {
     [patch],
   );
 
+  // The Worker evaluates alerts against the zones, so it gets every change to them.
+  useEffect(() => send({ type: "zones", zones: [...zones] }), [zones, send]);
+
+  const alerts = alertsMessage?.alerts ?? NO_ALERTS;
+  const zoneCounts = useMemo(() => new Map(alertsMessage?.zoneCounts ?? []), [alertsMessage]);
+  // Trucks with an active alert: diamonds on the map, first in the list. The same Set object until its
+  // members change: alert messages arrive up to twice a second (a zone count moving is enough), and a new
+  // Set each time re-sorted and re-rendered the whole truck list for nothing. The frame trace showed it.
+  const alertingKey = alerts
+    .filter((a) => a.active)
+    .map((a) => a.vehicleId)
+    .sort((a, b) => a - b)
+    .join(",");
+  const alerting = useMemo(() => new Set(alertingKey ? alertingKey.split(",").map(Number) : []), [alertingKey]);
+  useEffect(() => gpu.setAlerting(alerting), [alerting, gpu]);
+  const unseen = alerts.filter((a) => a.active && a.acknowledgedAt === undefined).length;
+  const names = useMemo<AlertNames>(() => {
+    const zoneName = new Map(zones.map((z) => [z.id, z.name]));
+    return {
+      plate: (id) => vehicles.get(id)?.plate ?? `Truck ${id}`,
+      zone: (id) => (id !== undefined ? zoneName.get(id) : undefined) ?? "a deleted zone",
+    };
+  }, [vehicles, zones]);
+  const act = useCallback(
+    (action: AlertAction, id?: number) =>
+      send(action === "resolve-cleared" ? { type: "alert", action } : { type: "alert", action, id: id! }),
+    [send],
+  );
+
+  // New alerts are announced politely, gathered so a burst is one sentence, never more than one
+  // every 5 s: a screen reader reading every alert as it lands would talk over everything else.
+  const queued = useRef<Alert[]>([]);
+  const lastSpoken = useRef(0);
+  const namesRef = useRef(names);
+  useEffect(() => {
+    namesRef.current = names;
+  }, [names]);
+  useEffect(() => {
+    if (!alertsMessage || alertsMessage.raised.length === 0) return;
+    const byId = new Map(alertsMessage.alerts.map((a) => [a.id, a]));
+    for (const id of alertsMessage.raised) {
+      const a = byId.get(id);
+      if (a) queued.current.push(a);
+    }
+    const wait = Math.max(0, lastSpoken.current + ANNOUNCE_EVERY_MS - Date.now());
+    const timer = setTimeout(() => {
+      if (queued.current.length === 0) return;
+      setAnnouncement(alertAnnouncement(queued.current, namesRef.current));
+      queued.current = [];
+      lastSpoken.current = Date.now();
+    }, wait);
+    return () => clearTimeout(timer);
+  }, [alertsMessage]);
+
+  // Drawing a zone: corners from map clicks or the map centre, then name it in the Zones panel.
+  const addCorner = useCallback((c: [number, number]) => setDraft((d) => (d ? [...d, c] : d)), []);
+  // While a draft exists the panel shows the drawing step; otherwise `draw` (idle or naming) decides.
+  const drawView: DrawState = draft !== null ? { step: "drawing", corners: draft.length } : draw;
+  const startDraw = useCallback(() => {
+    setTab("zones");
+    setDraft([]);
+  }, []);
+  const cancelDraw = useCallback(() => {
+    setDraft(null);
+    setDraw({ step: "idle" });
+  }, []);
+  const finishDraw = useCallback(() => {
+    if (!draft || draft.length < 3) return;
+    setDraw({ step: "naming", shape: [[[...draft, draft[0]!]]] });
+    setDraft(null);
+  }, [draft]);
+
   // Announce a selection once, politely, with what a sighted user sees in the drawer.
   const lastAnnounced = useRef<number | undefined>(undefined);
   useEffect(() => {
@@ -89,6 +177,16 @@ export function FleetApp() {
   // Keyboard: "/" search, "F" follow (both switchable off), "Escape" clear (not a character key).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // While drawing: Enter closes the shape, Backspace removes a corner, Escape cancels.
+      if (draft !== null && !isTyping(e.target)) {
+        const onButton = e.target instanceof HTMLButtonElement;
+        if (e.key === "Escape") cancelDraw();
+        else if (e.key === "Backspace") setDraft((d) => (d ? d.slice(0, -1) : d));
+        else if (e.key === "Enter" && !onButton) finishDraw();
+        else return;
+        e.preventDefault();
+        return;
+      }
       if (e.key === "Escape" && !isTyping(e.target)) {
         select(undefined);
         return;
@@ -97,22 +195,57 @@ export function FleetApp() {
       if (e.key === "/" && !isTyping(e.target)) {
         e.preventDefault();
         setSheetOpen(true);
-        document.getElementById("fleet-search")?.focus();
+        const search = document.getElementById("fleet-search");
+        if (search) search.focus();
+        else {
+          // On another tab (or a closed sheet) the search box doesn't exist until the next render.
+          setTab("trucks");
+          requestAnimationFrame(() => document.getElementById("fleet-search")?.focus());
+        }
       } else if ((e.key === "f" || e.key === "F") && !isTyping(e.target) && !e.ctrlKey && !e.metaKey) {
         setUi((u) => (u.vehicle === undefined ? u : { ...u, follow: !u.follow }));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [select, shortcuts]);
+  }, [select, shortcuts, draft, cancelDraw, finishDraw]);
 
-  const panel = <FleetPanel subscribe={subscribe} vehicles={vehicles} ui={ui} onUi={patch} onSelect={select} />;
+  const showTruck = useCallback(
+    (id: number) => {
+      select(id);
+      if (!desktop) setTab("trucks");
+    },
+    [select, desktop],
+  );
+  const drawerAlerts = useMemo(() => alerts.filter((a) => a.vehicleId === ui.vehicle), [alerts, ui.vehicle]);
+  const panel = (
+    <PanelTabs tab={tab} onTab={setTab} unseen={unseen}>
+      {tab === "trucks" && <FleetPanel subscribe={subscribe} vehicles={vehicles} ui={ui} onUi={patch} onSelect={select} alerting={alerting} />}
+      {tab === "alerts" && <AlertsPanel alerts={alerts} names={names} onShow={showTruck} onAct={act} />}
+      {tab === "zones" && (
+        <ZonesPanel
+          zones={zones}
+          counts={zoneCounts}
+          draw={drawView}
+          onStartDraw={startDraw}
+          onAddCentre={() => centre.current && addCorner(centre.current)}
+          onUndoCorner={() => setDraft((d) => (d ? d.slice(0, -1) : d))}
+          onFinishDraw={finishDraw}
+          onCancelDraw={cancelDraw}
+          onShowZone={(id) => setFocusZone((f) => ({ id, token: (f?.token ?? 0) + 1 }))}
+        />
+      )}
+    </PanelTabs>
+  );
   const drawer =
     ui.vehicle !== undefined ? (
       <VehicleDrawer
         vehicleId={ui.vehicle}
         info={vehicles.get(ui.vehicle)}
         subscribe={subscribe}
+        alerts={drawerAlerts}
+        names={names}
+        onAct={act}
         follow={ui.follow}
         onFollow={(follow) => patch({ follow })}
         onClose={() => select(undefined)}
@@ -121,11 +254,13 @@ export function FleetApp() {
 
   return (
     <div className="flex h-dvh flex-col">
+      {/* To the side panel, which exists on every tab. It pointed at the search box, which only the
+          Trucks tab has: on the others the link led nowhere (axe: skip-link, region). */}
       <a
-        href="#fleet-search"
+        href="#side-panel"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2 focus:shadow"
       >
-        Skip to truck search
+        Skip to the side panel
       </a>
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2">
         <div className="flex items-center gap-3">
@@ -159,6 +294,13 @@ export function FleetApp() {
             onPick={select}
             onUserMove={() => patch({ follow: false })}
             dark={dark}
+            zones={zones}
+            draft={draft}
+            onDraftCorner={addCorner}
+            onCentre={(c) => {
+              centre.current = c;
+            }}
+            focusZone={focusZone}
           />
           {desktop && drawer && <div className="absolute right-3 top-3 z-10 w-80">{drawer}</div>}
           {hud && <PerfHud gpu={gpu} />}
@@ -178,13 +320,20 @@ export function FleetApp() {
               className="flex min-h-12 items-center justify-center gap-2 text-sm font-medium"
             >
               <span aria-hidden className="h-1 w-10 rounded-full bg-control" />
-              {sheetOpen ? "Hide trucks" : "Show trucks"}
+              {sheetOpen ? "Hide panel" : "Show trucks, alerts and zones"}
+              {!sheetOpen && unseen > 0 && (
+                <span className="rounded-full bg-danger px-1.5 text-xs font-semibold tabular-nums text-surface">
+                  {unseen}
+                  <span className="sr-only"> new alerts</span>
+                </span>
+              )}
             </button>
             {sheetOpen && (
-              <div id="fleet-sheet" className="flex min-h-0 flex-1 flex-col">
+              // A landmark, like the desktop side panel: the tab bar would otherwise sit outside every landmark.
+              <aside id="fleet-sheet" className="flex min-h-0 flex-1 flex-col">
                 {drawer && <div className="px-3 pb-2">{drawer}</div>}
                 <div className="min-h-0 flex-1">{panel}</div>
-              </div>
+              </aside>
             )}
           </div>
         )}

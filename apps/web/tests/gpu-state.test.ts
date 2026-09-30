@@ -37,3 +37,22 @@ describe("FleetGpuState", () => {
     expect(state.epoch).toBe(2_000_000);
   });
 });
+
+describe("the alert texture", () => {
+  it("marks alerting trucks by slot, including one whose alert arrived before its first rows", () => {
+    const state = new FleetGpuState();
+    state.apply(rows(1_000_000, [0, 1], [42, 7], 2), 0);
+    state.setAlerting(new Set([7, 99])); // 99 has no slot yet
+    let tex = state.alertTexture();
+    expect([tex.data[0], tex.data[1], tex.data[2]]).toEqual([0, 255, 0]);
+    expect(state.alertCount).toBe(1);
+    const version = tex.version;
+    expect(state.alertTexture().version).toBe(version); // nothing changed: no rebuild, no upload
+
+    state.apply(rows(1_000_000, [2], [99], 3), 100);
+    tex = state.alertTexture();
+    expect(tex.data[2]).toBe(255);
+    expect(tex.version).toBe(version + 1);
+    expect(tex.data.length).toBe(tex.width * tex.height);
+  });
+});
