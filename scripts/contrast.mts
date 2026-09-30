@@ -19,7 +19,7 @@ const MEASURE = `(() => {
     const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3]));
     const ratio = (fg, bg) => { const [a, b] = [lum(over(fg, bg)), lum(bg)].sort((x, y) => y - x); return (a + 0.05) / (b + 0.05); };
     const out = [];
-    const roots = [...document.querySelectorAll("header, aside, section, [role=tabpanel], [aria-controls=fleet-sheet], #fleet-sheet")];
+    const roots = [...document.querySelectorAll("header, aside, section, [role=tabpanel], [aria-controls=fleet-sheet], #fleet-sheet, [data-replay-bar]")];
     const seen = new Set();
     for (const root of roots) for (const el of [root, ...root.querySelectorAll("*")]) {
       if (seen.has(el)) continue; seen.add(el);
@@ -69,6 +69,11 @@ for (const [label, viewport, mobile, colorScheme] of combos) {
     }
     rows.push(...((await page.evaluate(MEASURE)) as typeof rows).map((r) => ({ ...r, text: `${tab}: ${r.text}` })));
   }
+  // Replaying: the replay bar's controls and the status line's replay badge.
+  await page.waitForFunction(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Replay" && !b.disabled)`, undefined, { timeout: 120_000 });
+  await page.getByRole("button", { name: "Replay", exact: true }).click();
+  await page.waitForTimeout(800);
+  rows.push(...((await page.evaluate(MEASURE)) as typeof rows).map((r) => ({ ...r, text: `Replay: ${r.text}` })));
   const failing = rows.filter((r) => r.ratio < r.need);
   const byColour = new Map<string, { ratio: number; need: number; text: string; n: number }>();
   for (const r of rows) { const k = `${r.color}|${r.need}`; const e = byColour.get(k); if (!e || r.ratio < e.ratio) byColour.set(k, { ...r, n: (e?.n ?? 0) + 1 }); else e.n++; }

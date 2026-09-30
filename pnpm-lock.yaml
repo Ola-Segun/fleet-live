@@ -166,6 +166,25 @@ importers:
 
   packages/protocol: {}
 
+  packages/replay:
+    dependencies:
+      '@fleet/feed':
+        specifier: workspace:*
+        version: link:../feed
+      '@fleet/gl':
+        specifier: workspace:*
+        version: link:../gl
+      '@fleet/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@fleet/routes':
+        specifier: workspace:*
+        version: link:../routes
+      '@fleet/sim':
+        specifier: workspace:*
+        version: link:../sim
+
   packages/routes: {}
 
   packages/sim:
@@ -191,6 +210,9 @@ importers:
       '@fleet/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@fleet/replay':
+        specifier: workspace:*
+        version: link:../replay
       '@fleet/routes':
         specifier: workspace:*
         version: link:../routes

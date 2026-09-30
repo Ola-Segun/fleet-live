@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Alert } from "@fleet/alerts";
-import { announcement as alertAnnouncement, type AlertNames } from "@/lib/alert-text";
+import { announcement as alertAnnouncement, lagosTime, type AlertNames } from "@/lib/alert-text";
 import { useZones } from "@/lib/zones";
 import { DEFAULT_CAMERA, parseCamera } from "@/lib/camera-url";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -15,6 +15,7 @@ import { configFromSearch } from "@/lib/worker-messages";
 import { AlertsPanel, type AlertAction } from "./AlertsPanel";
 import { FleetPanel } from "./FleetPanel";
 import { PanelTabs, type PanelTab } from "./PanelTabs";
+import { ReplayBar, replayNow, type ReplayState } from "./ReplayBar";
 import { ZonesPanel, type DrawState } from "./ZonesPanel";
 import type { TruckLayerKind } from "./LiveMap";
 import { PerfHud } from "./PerfHud";
@@ -55,6 +56,10 @@ export function FleetApp() {
   const [draw, setDraw] = useState<DrawState>({ step: "idle" });
   const [focusZone, setFocusZone] = useState<{ id: string; token: number } | null>(null);
   const centre = useRef<[number, number] | null>(null);
+  // Replay (Layer 9). The page and the Worker run the same clock from this anchor.
+  const [replay, setReplay] = useState<ReplayState | null>(null);
+  const replaying = useRef(false);
+  const history = status?.history;
   const layer: TruckLayerKind =
     params.get("trucks") === "off" ? "off" : params.get("layer") === "baseline" ? "baseline" : "gl";
   const [announcement, setAnnouncement] = useState("");
@@ -146,6 +151,36 @@ export function FleetApp() {
     return () => clearTimeout(timer);
   }, [alertsMessage]);
 
+  const changeReplay = useCallback(
+    (next: { at: number; speed: number; playing: boolean }) => {
+      const r: ReplayState = { ...next, local: performance.now() };
+      if (!replaying.current) setAnnouncement(`Replay at ${lagosTime(next.at)}, paused. The map, list and details show that time. Alerts stay live.`);
+      replaying.current = true;
+      setReplay(r);
+      gpu.setReplay(r);
+      send({ type: "replay", at: next.at, wall: Date.now(), speed: next.speed, playing: next.playing });
+    },
+    [gpu, send],
+  );
+  const goLive = useCallback(
+    (reason = "Back to live.") => {
+      replaying.current = false;
+      setReplay(null);
+      gpu.setReplay(undefined);
+      send({ type: "live" });
+      setAnnouncement(reason);
+    },
+    [gpu, send],
+  );
+  // Playing forwards reaches the newest recorded moment: that's live, so go there.
+  useEffect(() => {
+    if (!replay?.playing || !history) return;
+    const timer = setInterval(() => {
+      if (replayNow(replay) >= history.to) goLive("Caught up with live.");
+    }, 250);
+    return () => clearInterval(timer);
+  }, [replay, history, goLive]);
+
   // Drawing a zone: corners from map clicks or the map centre, then name it in the Zones panel.
   const addCorner = useCallback((c: [number, number]) => setDraft((d) => (d ? [...d, c] : d)), []);
   // While a draft exists the panel shows the drawing step; otherwise `draw` (idle or naming) decides.
@@ -221,7 +256,7 @@ export function FleetApp() {
   const panel = (
     <PanelTabs tab={tab} onTab={setTab} unseen={unseen}>
       {tab === "trucks" && <FleetPanel subscribe={subscribe} vehicles={vehicles} ui={ui} onUi={patch} onSelect={select} alerting={alerting} />}
-      {tab === "alerts" && <AlertsPanel alerts={alerts} names={names} onShow={showTruck} onAct={act} />}
+      {tab === "alerts" && <AlertsPanel alerts={alerts} names={names} onShow={showTruck} onAct={act} replaying={replay !== null} />}
       {tab === "zones" && (
         <ZonesPanel
           zones={zones}
@@ -303,6 +338,10 @@ export function FleetApp() {
             focusZone={focusZone}
           />
           {desktop && drawer && <div className="absolute right-3 top-3 z-10 w-80">{drawer}</div>}
+          {/* Desktop: along the bottom, clear of the zoom controls. Phone: along the top, clear of the sheet. */}
+          <div className={`absolute z-10 ${desktop ? "bottom-3 left-3 right-16 max-w-3xl" : "inset-x-3 top-3"}`}>
+            <ReplayBar history={history} replay={replay} onChange={changeReplay} onLive={() => goLive()} />
+          </div>
           {hud && <PerfHud gpu={gpu} />}
         </main>
 

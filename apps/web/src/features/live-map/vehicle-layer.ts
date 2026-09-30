@@ -159,13 +159,13 @@ export class VehicleLayer implements CustomLayerInterface {
   render(gl: WebGLRenderingContext | WebGL2RenderingContext, args: CustomRenderMethodInput): void {
     const g = gl as WebGL2RenderingContext;
     const map = this.map;
-    const { mirror, clock, epoch } = this.state;
+    const { mirror, epoch } = this.state;
     if (!map || !this.program || epoch === undefined || mirror.count === 0) {
       this.stats.skipped++;
       return;
     }
     const start = performance.now();
-    const display = clock.now(start);
+    const display = this.state.displayTime(start);
     if (display === undefined) return;
     this.state.lastDisplay = display;
 

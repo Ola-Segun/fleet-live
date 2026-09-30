@@ -192,7 +192,7 @@ Each row becomes a GitHub issue with these acceptance criteria.
 | L6 | Geofences | Draw a zone (depot, restricted area), or import GeoJSON. Enter and exit alerts use a **20 m margin and a 10 s dwell**, so GPS noise at the edge doesn't fire enter/exit/enter |
 | L7 | Alerts | Geofence breach, offline over 2 minutes (10 with the ignition off: the tracker reports less often), speeding (over 60 km/h for 10 s, ending below 55). Acknowledge and resolve. New alerts are announced politely, gathered to at most one announcement every 5 s; vehicle movement never is. See ADR 0012 |
 | L8 | Connection truth | Live, reconnecting (with countdown) or offline indicator. Data freshness always visible |
-| L9 | Replay | Scrub the last hour. Play at 1× to 60×. The whole fleet rewinds through the same renderer |
+| L9 | Replay | Scrub the last hour. Play at 1×, 10× or 60×. The whole fleet rewinds through the same renderer, list and details panel. Alerts stay live. See ADR 0013 |
 | L10 | Raw vs smoothed | Toggle an overlay of the raw pings to see the smoothing at work |
 | L11 | Works on a phone | Map full screen, bottom sheet with snap points and drag to dismiss, tap targets at least 24 px |
 | L12 | Every state is reachable | Loading, empty (filter matches nothing), stale fleet, disconnected, WebGL unavailable (falls back to the list). All reachable by scenario for tests |
@@ -203,7 +203,7 @@ Each row becomes a GitHub issue with these acceptance criteria.
 
 | Layer | Holds | Tool |
 | --- | --- | --- |
-| URL | Filters, camera (`@lat,lng,zoom`), selected vehicle, follow flag, replay time | `nuqs` |
+| URL | Filters, camera (`@lat,lng,zoom`), selected vehicle, follow flag. Not replay time: the history lives in the Worker for the session, so a link to 14:05 would open onto a fleet that has no 14:05 (Layer 9). Server-side history would make it possible | Plain `URLSearchParams` and `history.replaceState` (Layer 8a) |
 | UI store | Panels, drawer, geofence edit mode, HUD toggle | Zustand, with immutable updates only |
 | Worker | Every vehicle sample, the spatial index, geofence state, alerts | Plain typed arrays |
 | GPU | Sample texture, instance buffer | WebGL2 |

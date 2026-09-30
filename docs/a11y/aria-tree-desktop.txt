@@ -3,7 +3,7 @@
 - banner:
   - heading "Fleet Live" [level=1]
   - 'button "Single-key shortcuts: on" [pressed]'
-  - paragraph: Demo fleet Live Connection live 4,953 trucks as of 1.3 s ago
+  - paragraph: Demo fleet Live Connection live 4,966 trucks as of 1.3 s ago
 - complementary:
   - tablist "Panel":
     - tab "Trucks" [selected]
@@ -14,37 +14,37 @@
       - text: Search trucks by plate or driver
       - searchbox "Search trucks by plate or driver"
       - group "Show statuses":
-        - button "Moving 4,177" [pressed]
-        - button "Parked 776" [pressed]
-        - button "Stale 0" [pressed]
-      - text: 4,953 of 4,953 trucks 0 trucks shown Sort
+        - button "Moving 4,905" [pressed]
+        - button "Parked 49" [pressed]
+        - button "Stale 3" [pressed]
+      - text: 4,966 of 4,966 trucks 0 trucks shown Sort
       - combobox "Sort":
         - option "Needs attention" [selected]
         - option "Plate"
         - option "Speed"
       - listbox "Trucks":
-        - option "IKD-340UA Yusuf Bello No recent report, 17 km/h"
-        - option "AGL-349GG Obinna Adeyemi Moving, projected, 30 km/h"
-        - option "AGL-385RF Chinedu Mohammed Moving, projected, 26 km/h"
-        - option "AGL-387WZ Ifeanyi Garba Moving, projected, 29 km/h"
-        - option "AGL-648BQ Tunde Okonkwo Moving, projected, 8 km/h"
-        - option "AGL-675SE Sani Afolabi Moving, projected, 29 km/h"
-        - option "AGL-895FN Chukwuma Mohammed Moving, projected, 29 km/h"
-        - option "APP-246FL Adebayo Eze Moving, projected, 27 km/h"
-        - option "APP-396EJ Musa Danjuma Moving, projected, 28 km/h"
-        - option "APP-461AE Adebayo Olawale Moving, projected, 29 km/h"
-        - option "APP-596NQ Bola Okafor Moving, projected, 28 km/h"
-        - option "APP-825FR Aliyu Garba Moving, projected, 2 km/h"
-        - option "APP-916TB Aliyu Nwosu Moving, projected, 27 km/h"
-        - option "APP-988HC Aliyu Bello Moving, projected, 23 km/h"
-        - option "BDG-252QK Abdullahi Nwankwo Moving, projected, 28 km/h"
-        - option "BDG-420WG Emeka Danjuma Moving, projected, 2 km/h"
-        - option "BDG-464YH Adebayo Abubakar Moving, projected, 26 km/h"
-        - option "BDG-575AK Femi Bello Moving, projected, 28 km/h"
-        - option "BDG-676JH Aliyu Mohammed Moving, projected, 28 km/h"
-        - option "BDG-809NN Bola Afolabi Moving, projected, 29 km/h"
-        - option "BDG-865HA Nnamdi Ogunleye Moving, projected, 30 km/h"
-        - option "BDG-900FT Uche Mohammed Moving, projected, 29 km/h"
+        - option "FKJ-372NQ Chukwuma Yakubu Stale"
+        - option "IKD-340UA Yusuf Bello Stale"
+        - option "MUS-859HC Nnamdi Adeyemi Stale"
+        - option "KJA-625UR Aliyu Mohammed No recent report, 27 km/h"
+        - option "KTU-988EQ Obinna Ogunleye No recent report, 30 km/h"
+        - option "AGL-215LX Bola Afolabi Moving, projected, 28 km/h"
+        - option "AGL-227TL Ibrahim Onyeka Moving, projected, 31 km/h"
+        - option "AGL-492WG Chukwuma Abubakar Moving, projected, 31 km/h"
+        - option "AGL-617TW Aliyu Ajayi Moving, projected, 23 km/h"
+        - option "AGL-631EE Chinedu Olawale Moving, projected, 23 km/h"
+        - option "AGL-687RH Femi Balogun Moving, projected, 21 km/h"
+        - option "AGL-806DS Kunle Olawale Moving, projected, 35 km/h"
+        - option "AGL-862KD Nnamdi Yakubu Moving, projected, 29 km/h"
+        - option "AGL-991TY Yusuf Adeyemi Moving, projected, 24 km/h"
+        - option "APP-254WG Nnamdi Garba Moving, projected, 27 km/h"
+        - option "APP-284BN Ibrahim Ajayi Moving, projected, 32 km/h"
+        - option "APP-329FL Bola Eze Moving, projected, 16 km/h"
+        - option "APP-401LD Nnamdi Afolabi Moving, projected, 30 km/h"
+        - option "APP-407AJ Gbenga Danjuma Moving, projected, 32 km/h"
+        - option "APP-454GW Bola Adebisi Moving, projected, 30 km/h"
+        - option "APP-539XR Gbenga Garba Moving, projected, 23 km/h"
+        - option "APP-726XM Tunde Olawale Moving, projected, 15 km/h"
 - main:
   - region "Map of the fleet":
     - region "Map"
@@ -59,5 +59,7 @@
       - text: Data from
       - link "OpenStreetMap":
         - /url: https://www.openstreetmap.org/copyright
+  - button "Replay" [disabled]
+  - text: Recording for replay…
 - paragraph
 - alert

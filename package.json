@@ -7,14 +7,15 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc -p packages/protocol --noEmit && tsc -p packages/routes --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/feed --noEmit && tsc -p packages/gl --noEmit && tsc -p packages/alerts --noEmit && tsc -p packages/transport --noEmit && tsc -p apps/sim-server --noEmit && pnpm --filter @fleet/web typecheck",
+    "typecheck": "tsc -p packages/protocol --noEmit && tsc -p packages/routes --noEmit && tsc -p packages/sim --noEmit && tsc -p packages/feed --noEmit && tsc -p packages/gl --noEmit && tsc -p packages/alerts --noEmit && tsc -p packages/replay --noEmit && tsc -p packages/transport --noEmit && tsc -p apps/sim-server --noEmit && pnpm --filter @fleet/web typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:web": "tsx scripts/smoke-web.mts",
     "smoke:ui": "tsx scripts/smoke-ui.mts",
     "a11y": "tsx scripts/a11y.mts",
     "a11y:contrast": "tsx scripts/contrast.mts",
-    "smoke:alerts": "tsx scripts/smoke-alerts.mts"
+    "smoke:alerts": "tsx scripts/smoke-alerts.mts",
+    "smoke:replay": "tsx scripts/smoke-replay.mts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

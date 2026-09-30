@@ -1,15 +1,9 @@
-- tabpanel "Alerts 52 new":
-  - paragraph: "52 open: 52 active, 0 ended"
+- tabpanel "Alerts 51 new":
+  - paragraph: "51 open: 51 active, 0 ended"
   - button "Resolve all ended" [disabled]
   - list "Open alerts":
     - listitem:
-      - paragraph: KJA-211VC speeding, up to 64 km/h
-      - paragraph: Active, raised 22:30:45
-      - button "Show truck"
-      - button "Acknowledge"
-      - button "Resolve"
-    - listitem:
-      - paragraph: FKJ-895RV speeding, up to 74 km/h
+      - paragraph: FKJ-895RV speeding, up to 73 km/h
       - paragraph: Active, raised 22:30:38
       - button "Show truck"
       - button "Acknowledge"
@@ -219,7 +213,7 @@
       - button "Acknowledge"
       - button "Resolve"
     - listitem:
-      - paragraph: AGL-557CF speeding, up to 76 km/h
+      - paragraph: AGL-557CF speeding, up to 75 km/h
       - paragraph: Active, raised 22:30:38
       - button "Show truck"
       - button "Acknowledge"

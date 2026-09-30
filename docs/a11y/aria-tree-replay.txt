@@ -1,0 +1,10 @@
+- group "Replay":
+  - button "Back to live"
+  - button "Play"
+  - text: Replay time
+  - slider "Replay time": "1790803825000"
+  - text: 22:30:25 20 s ago Speed
+  - combobox "Playback speed":
+    - option "1×" [selected]
+    - option "10×"
+    - option "60×"

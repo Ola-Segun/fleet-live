@@ -14,6 +14,8 @@ interface Props {
   names: AlertNames;
   onShow: (vehicleId: number) => void;
   onAct: (action: AlertAction, id?: number) => void;
+  /** Replay is on: the map shows the past, but this list is live. */
+  replaying?: boolean;
 }
 
 const KIND_GLYPH: Record<Alert["kind"], string> = { "zone-enter": "⇥", "zone-exit": "⇤", speeding: "⏵⏵", offline: "⌀" };
@@ -32,7 +34,7 @@ const KIND_GLYPH: Record<Alert["kind"], string> = { "zone-enter": "⇥", "zone-e
  * the list or focus is inside it, the order is frozen. New alerts wait behind
  * a "Show N new" button in the header, which doesn't move the rows.
  */
-export function AlertsPanel({ alerts, names, onShow, onAct }: Props) {
+export function AlertsPanel({ alerts, names, onShow, onAct, replaying = false }: Props) {
   // Ids in the order they were shown when the person started interacting, or null for live order.
   const [pinned, setPinned] = useState<number[] | null>(null);
   const pointerInside = useRef(false);
@@ -100,6 +102,7 @@ export function AlertsPanel({ alerts, names, onShow, onAct }: Props) {
         </button>
       </div>
 
+      {replaying && <p className="border-b border-line px-3 py-2 text-xs text-muted">Replaying the map. These alerts are live.</p>}
       {alerts.length === 0 ? (
         <p className="p-4 text-sm text-muted">
           Trucks over 60 km/h for 10 seconds, trucks that stop reporting for 2 minutes (10 when parked), and entries to

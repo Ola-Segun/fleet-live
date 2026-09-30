@@ -21,6 +21,8 @@ export interface FleetPerf {
   layer?: { frames: number; renderMs: number; uploads: number; contextRestores: number; layersAdded: number; skipped: number };
   /** How long the last click took to find the truck under it, ms. */
   lastPickMs?: number;
+  /** Where truck `id` was drawn in the last frame, and at what display time: lets a browser check compare replay with live. Read-only. */
+  probe?: (id: number) => { at: number; lat: number; lon: number; mode: number } | undefined;
 }
 
 declare global {

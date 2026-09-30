@@ -1,5 +1,6 @@
 import { AlertEngine, type Alert, type ZoneSpec } from "@fleet/alerts";
 import { Feed, type FeedStats } from "@fleet/feed";
+import { History, ReplayView } from "@fleet/replay";
 import { FLOATS_PER_VEHICLE, packVehicle } from "@fleet/gl";
 import type { VehicleInfo } from "@fleet/sim";
 import type { ConnectionStatus } from "./connection";
@@ -38,9 +39,38 @@ export interface AlertsMessage {
   raised: number[];
 }
 
+/**
+ * Replay as the page asked for it: the data time `at` it showed at wall-clock
+ * time `wall` (Date.now()), advancing at `speed` × real time while playing.
+ * Page and Worker each run this same clock, so neither waits for the other.
+ */
+export interface ReplayRequest {
+  at: number;
+  wall: number;
+  speed: number;
+  playing: boolean;
+}
+
+/** What replay can reach, and what it costs to keep. */
+export interface HistoryStatus {
+  from: number;
+  to: number;
+  bytes: number;
+}
+
 /** Messages from the Worker to the page. */
 export type WorkerToMain =
-  | { type: "status"; mode: FrameSource["mode"]; connection: ConnectionStatus; feed: FeedStats; delayMs: number }
+  | {
+      type: "status";
+      mode: FrameSource["mode"];
+      connection: ConnectionStatus;
+      feed: FeedStats;
+      delayMs: number;
+      /** Undefined until two frames are recorded. */
+      history: HistoryStatus | undefined;
+      /** The replay time the Worker is drawing, or undefined when live. */
+      replayAt: number | undefined;
+    }
   | AlertsMessage
   | { type: "snapshot"; snapshot: FleetSnapshot }
   | { type: "vehicles"; vehicles: VehicleInfo[] }
@@ -57,6 +87,12 @@ export type Post = (message: WorkerToMain, transfer?: Transferable[]) => void;
  * Alerts (Layer 8b) are evaluated on each snapshot, before it is posted: the
  * snapshot's buffers are transferred, so after posting they are gone.
  *
+ * Replay (Layer 9): every 5 s of display time the fleet is recorded into the
+ * history. In replay, the rows and the snapshot come from the history at the
+ * replay time instead of the live feed, through the same message types, so the
+ * page's renderer, list and details panel don't know the difference. Alerts
+ * and recording carry on live underneath.
+ *
  * It takes `post` as a function rather than calling `self.postMessage`, so it
  * runs unchanged in a Node test. The Worker entry (Layer 6) is a few lines
  * that wire `self.postMessage` and `self.onmessage` to this.
@@ -68,6 +104,11 @@ export class FleetCore {
   private rowsTimer: ReturnType<typeof setInterval> | undefined;
   private readonly slots = new Map<number, number>();
   private epoch: number | undefined;
+  readonly history: History;
+  private replay: ReplayRequest | undefined;
+  private view: ReplayView | undefined;
+  /** After replay, every truck's live row must be sent again: the page's rows are replay's. */
+  private repackAll = false;
 
   constructor(
     private readonly source: FrameSource,
@@ -76,9 +117,36 @@ export class FleetCore {
     feed?: Feed,
     private readonly rowsHz = 10,
     alerts?: AlertEngine,
+    history?: History,
+    private readonly now: () => number = Date.now,
   ) {
     this.feed = feed ?? new Feed();
     this.alerts = alerts ?? new AlertEngine();
+    this.history = history ?? new History();
+  }
+
+  /** Enter replay, change it (scrub, speed, pause), or leave it with `undefined`. */
+  setReplay(request: ReplayRequest | undefined): void {
+    if (request && this.epoch === undefined) return; // nothing drawn yet, so nothing to replay
+    if (request && !this.view) {
+      this.view = new ReplayView(this.history, this.epoch!);
+    }
+    if (!request && this.view) {
+      this.view = undefined;
+      this.repackAll = true;
+    }
+    // A jump or a new speed: every packed window may be for the wrong time now.
+    this.view?.invalidateAll();
+    this.replay = request;
+  }
+
+  /** The data time replay is at, kept inside what the history holds. */
+  replayTime(): number | undefined {
+    const r = this.replay;
+    const range = this.history.range();
+    if (!r || !range) return undefined;
+    const t = r.at + (r.playing ? (this.now() - r.wall) * r.speed : 0);
+    return Math.min(range.to, Math.max(range.from, t));
   }
 
   start(): void {
@@ -101,15 +169,27 @@ export class FleetCore {
   }
 
   publish(): void {
+    const range = this.history.range();
+    const replayAt = this.replayTime();
     this.post({
       type: "status",
       mode: this.source.mode,
       connection: this.source.status(),
       feed: { ...this.feed.stats },
       delayMs: this.feed.delayMs,
+      history: range && { ...range, bytes: this.history.stats().bytes },
+      replayAt,
     });
-    const snapshot = buildSnapshot(this.feed);
-    if (snapshot.count > 0 && this.alerts.evaluate(snapshot)) this.publishAlerts();
+    const live = buildSnapshot(this.feed);
+    if (live.count > 0 && this.alerts.evaluate(live)) this.publishAlerts();
+    // Record the fleet when display time crosses the next grid time (every 5 s).
+    const due = live.count > 0 ? this.history.due(live.displayTime) : undefined;
+    if (due !== undefined) this.history.record(due === live.displayTime ? live : buildSnapshot(this.feed, due));
+
+    const snapshot: FleetSnapshot =
+      this.view && replayAt !== undefined
+        ? { ...this.view.snapshot(replayAt, this.slots), serverTime: this.feed.serverTime, delayMs: this.feed.delayMs }
+        : live;
     this.post({ type: "snapshot", snapshot }, snapshotTransfer(snapshot));
   }
 
@@ -129,26 +209,36 @@ export class FleetCore {
     this.publishAlerts();
   }
 
-  /** Rows for the GPU: only the vehicles that changed since the last call. */
+  /**
+   * Rows for the GPU. Live: only the vehicles that changed since the last call
+   * (all of them, just after replay). Replay: only the trucks whose packed
+   * samples no longer cover the replay time.
+   */
   publishRows(): void {
     if (this.feed.serverTime === 0) return; // nothing received yet
     // Fixed at the first report, in whole seconds, so float32 sample times start small.
     this.epoch ??= Math.floor(this.feed.serverTime / 1000) * 1000;
     const changed = this.feed.drainChanged();
     const newIds: number[] = [];
-    const slots = new Uint32Array(changed.size);
-    const data = new Float32Array(changed.size * FLOATS_PER_VEHICLE);
-    let i = 0;
     for (const id of changed) {
-      let slot = this.slots.get(id);
-      if (slot === undefined) {
-        slot = this.slots.size;
-        this.slots.set(id, slot);
-        newIds.push(id);
-      }
-      slots[i] = slot;
-      packVehicle(this.feed.track(id)!.resolve(), this.epoch, data, i * FLOATS_PER_VEHICLE);
-      i++;
+      if (this.slots.has(id)) continue;
+      this.slots.set(id, this.slots.size);
+      newIds.push(id);
+    }
+    const replayAt = this.replayTime();
+    let slots: Uint32Array;
+    let data: Float32Array;
+    if (this.view && replayAt !== undefined) {
+      ({ slots, data } = this.view.update(replayAt, this.slots));
+    } else {
+      const ids = this.repackAll ? [...this.feed.vehicleIds()] : [...changed];
+      this.repackAll = false;
+      slots = new Uint32Array(ids.length);
+      data = new Float32Array(ids.length * FLOATS_PER_VEHICLE);
+      ids.forEach((id, i) => {
+        slots[i] = this.slots.get(id)!;
+        packVehicle(this.feed.track(id)!.resolve(), this.epoch!, data, i * FLOATS_PER_VEHICLE);
+      });
     }
     this.post(
       {
