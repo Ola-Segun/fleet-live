@@ -242,6 +242,18 @@ describe("demo source and worker core", () => {
     expect(frames).toEqual(expected.map((f) => ({ ...f, pings: f.pings.map(quantize) })));
   });
 
+  it("tells the page every vehicle's plate and driver, once", async () => {
+    const sim = new Simulation(lagos, { seed: 4, vehicleCount: 12, startTime: T0 });
+    const posted: WorkerToMain[] = [];
+    const core = new FleetCore(new DemoSource(sim), (message) => posted.push(message));
+    core.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    core.stop();
+    const lists = posted.filter((m) => m.type === "vehicles");
+    expect(lists).toHaveLength(1);
+    expect(lists[0]!.type === "vehicles" && lists[0]!.vehicles).toEqual(sim.info());
+  });
+
   it("posts a status and a transferable snapshot twice a second", () => {
     const sim = new Simulation(lagos, { seed: 4, vehicleCount: 80, startTime: T0 });
     const posted: { message: WorkerToMain; transfer?: Transferable[] }[] = [];

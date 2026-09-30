@@ -15,7 +15,8 @@ how it's engineered and proved.
 | 5 | Transport: Worker core, socket server, demo mode (`packages/transport`, `apps/sim-server`) | Keeps 5,000 updates a second off the main thread, and survives dropped connections | **Done** |
 | 6 | Next.js shell, base map, baseline truck layer (`apps/web`) | The frame everything visible sits in, and a measured baseline for Layer 7 to beat | **Done** |
 | 7 | WebGL2 truck layer (`packages/gl`, `apps/web`) | Draws 5,000 moving trucks smoothly, in one draw call | **Done** |
-| 8 | Product UI | What a dispatcher actually uses: search, drawer, list, alerts, geofences | Next |
+| 8a | Find, inspect, follow, list (`apps/web`) | What a dispatcher actually uses: search, details, follow, the accessible list | **Done** |
+| 8b | Alerts and geofences | Tells the dispatcher what needs attention, instead of making them look | Next |
 | 9 | Replay | Answers "what happened at 14:05?" using the same renderer | |
 | 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | |
 
@@ -859,3 +860,148 @@ trucks, 10 s of steady state after start-up):
 - To measure: `pnpm --filter @fleet/web build`, then
   `pnpm --filter @fleet/web start -p 3100`, then `pnpm smoke:web`,
   `pnpm smoke:web "?layer=baseline"` and `pnpm smoke:web "?trucks=off"`.
+
+---
+
+## Layer 8a · Find, inspect, follow, list
+
+**Why this layer exists**
+
+- **A map of 5,000 dots isn't a tool.** A dispatcher's real questions are
+  "where is KJA-482XR?", "what's it doing?" and "show me every stale truck".
+  Until this layer, nobody could ask any of them.
+- **The list is the accessible map.** Everything on the canvas must also be
+  reachable without seeing it, by keyboard and screen reader. The design made
+  that a requirement, not a nicety.
+- **It must not undo Layer 7.** Status filtering happens in the shader, at zero
+  CPU. Picking runs only when someone clicks. React only receives what people
+  read, at 2 Hz.
+- Layer 8 was split in two so each half is finished and tested on its own:
+  **8a** (this) and **8b**, alerts and geofences.
+
+**What exists**
+
+| Part | What it does |
+| --- | --- |
+| `FrameSource.vehicles()` | Plate and driver for every truck: from the simulator in demo mode, from the server's `/vehicles` in network mode. Posted to the page once |
+| `gl`: `slotEstimate`, `modeMask`, `u_selected`, `u_pass` | One truck read from the page's texture copy exactly as drawn. The status filter as a bit mask the shader tests. The selected truck drawn larger with a ring, in a second pass so it's on top |
+| `lib/fleet-view.ts` | The list's order as numeric sort keys, rows built only for the visible window, group counts, windowing, nearest-truck picking |
+| `lib/ui-url.ts` | The view in the URL: `?v=` truck, `f=1` follow, `s=` statuses, `q=` search |
+| `FleetPanel` | Search, status toggles with counts, sort, and a virtualised listbox |
+| `VehicleDrawer` | Plate, driver, status (the map's own shape), speed, heading, last report, and a follow switch |
+| `FleetApp` | UI state kept in sync with the URL and the GPU, keyboard shortcuts, a polite live region, and one layout at a time (desktop list, or a phone sheet) |
+| `LiveMap` | Click-to-pick, follow mode, easing to a selected truck, camera URL writes throttled to 1/s |
+| `scripts/smoke-ui.mts` | 15 checks in Chrome, done the way a person would do them |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Filtering in the shader** (`u_modeMask`) | Hiding parked trucks costs no CPU, and the map and list filter by the same status groups, so they can't disagree |
+| **Picking only on click, using the GPU's own estimate** | It reads `slotEstimate` from the page's texture copy, so you click what you see. Trucks outside the click's box are rejected in degrees before any projection. **6.5–22 ms** across ~5,000 trucks, and only when someone clicks |
+| **The list sorts numbers, not objects** | Each row becomes one float64 key (primary × 2³⁰ + plateRank × 2¹⁵ + rowIndex), and a `Float64Array` is sorted natively. Plate ranks and search text are computed once per vehicle list. Row objects exist only for the ~20 rows on screen |
+| **Keyboard focus follows a truck, not a row number** | The default sort reorders live. An index would slide to a different truck under the cursor |
+| **The active row is always rendered** | `aria-activedescendant` must point at an element that exists, even when the live sort has moved the active truck off screen |
+| **One layout exists at a time** (`useMediaQuery` with `useSyncExternalStore`) | A CSS-hidden second panel would duplicate `id`s and listbox semantics. The server value keeps hydration consistent |
+| **Follow gives way to the person** | Every MapLibre camera call stops gestures in progress. Follow re-centres only when no pointer is down and the map isn't mid-gesture. A drag hands control back |
+| **The "bring into view" ease runs on selection change only** | Running it on follow changes flew back to the truck mid-drag (see Found while building) |
+| **Camera URL writes at most once a second** | Follow moves the camera every frame, and Chrome throttles `history.replaceState` after about 100 calls in 10 s |
+| **Selection stored by vehicle id; slot looked up at draw time** | A truck selected from the URL may have no slot yet, because its first rows are still on the way |
+
+**Accessibility**
+
+- **Keyboard.**
+  - `/` focuses search, and Enter there selects the first match.
+  - In the list, arrows, Page Up/Down, Home and End move, and Enter selects.
+  - `F` toggles follow and `Escape` clears the selection.
+  - A skip link leads to search.
+- **Screen readers.**
+  - The list is a `listbox` with `aria-setsize` and `aria-posinset`, so it
+    announces its true size even though it's virtualised.
+  - Filters are toggle buttons with `aria-pressed`.
+  - The count and each selection are announced politely.
+- **Status is never colour alone.** The list and detail panel use the shader's
+  own shapes: arrow, dot, ring.
+- **Targets.** The phone sheet's toggle is 48 px tall, and the pick radius is
+  24 px (WCAG 2.2's minimum target size).
+- **Not yet done:** an automated axe scan and a manual NVDA pass. Both are
+  scheduled for Layer 10, where the design puts them.
+
+**How it is tested:** 154 tests across the workspace.
+
+- **Unit** (Node):
+  - Search ignores case, spaces and hyphens ("kja482" finds KJA-482XR).
+  - Filters match the shader's groups, and the three sorts come out in the
+    expected order.
+  - A too-large fleet is refused rather than mis-sorted.
+  - Windowing, picking (nearest within the radius, nothing beyond it), the URL
+    round trip, and malformed input.
+  - The status mask's bits and `slotOffset` against `texelOf`.
+  - `slotEstimate` against `gpuEstimate`.
+  - Vehicle details from both sources, including network mode against a real
+    server.
+- **In Chrome** (`pnpm smoke:ui`), **15 checks, 5 of 5 runs passing**:
+  - Only one search box and one list exist.
+  - `/` focuses search, and typing a partial plate narrows the list.
+  - Enter opens the first match.
+  - `F` follows, and the camera moves with the truck.
+  - Dragging stops following without losing the selection.
+  - Clicking a truck selects it, and `Escape` clears it.
+  - Turning Parked off hides parked trucks and updates the URL.
+  - The truck highlighted by keyboard is the one that opens, even as the live
+    sort reorders.
+  - The frame rate holds with the list live.
+  - A deep link reopens a truck, following it.
+  - On a phone, the map spans the width, the sheet opens with one search and
+    one list, and its toggle is 48 px tall.
+
+**Measured** (the built app in headless Chrome with software WebGL, with the
+list, a selection and the panel live, 10 s):
+
+| | Result |
+| --- | --- |
+| Frame rate | 58–60 fps |
+| p99 frame | 16.9–17.1 ms in 3 of 8 runs, ~33 ms in 5 (a single dropped frame, not a stall) |
+| Long tasks | 0 in 7 of 8 runs, 1 in one |
+| List rebuild, 4,950 trucks | **2.1–2.5 ms median** (was 13–15 ms), under 1 ms while searching |
+| Click-to-pick | 6.5–22 ms |
+
+The remaining occasional dropped frame is React re-rendering the list and panel
+twice a second. That is scheduled for a profiler pass in Layer 10 rather than
+guessed at here.
+
+**Found while building**
+
+1. **Follow mode fought the person, twice.**
+   - First, the per-frame re-centre cancelled drags, because every MapLibre
+     camera call stops gestures. Follow now yields while a pointer is down or
+     the map is moving.
+   - Then the real culprit appeared in an event trace: switching follow off at
+     drag start re-ran the "bring into view" effect, whose `easeTo` cancelled
+     the drag and turned its release into a click on empty map, clearing the
+     selection. The effect now runs on selection change only.
+   - Both were found by driving the app in Chrome. Neither would show up in a
+     unit test.
+2. **The list cost a dropped frame every rebuild.** Measured at 13–15 ms (up to
+   25 ms) for 5,000 trucks, from building and sorting row objects with a
+   comparison function. The numeric sort-key design brought it to about 2 ms.
+3. **Keyboard focus slid between trucks.** The active row was an index, and the
+   live sort reordered under it. A flaky check caught it, and focus now follows
+   the truck.
+4. **`aria-activedescendant` pointed at nothing.** When the live sort moved the
+   active truck off screen, virtualisation removed its element. An intermittent
+   crash in the check exposed it, and the active row is now always rendered.
+5. **A hidden duplicate panel.** Selecting a truck opened the phone sheet, which
+   on desktop was only CSS-hidden, so a second search box and list mounted with
+   duplicate ids. The layout is now decided in JavaScript, and a check asserts
+   exactly one of each.
+6. **Two refs written during render.** The React Compiler lint caught them, and
+   they now update in effects.
+7. **`localeCompare` over 5,000 rows twice a second.** Plates are ASCII, so a
+   plain comparison gives the same order.
+
+**Run it:**
+
+- `pnpm --filter @fleet/web dev`, then try `/`, arrows, Enter, `F` and `Escape`.
+- To test in Chrome: `pnpm --filter @fleet/web build`, then
+  `pnpm --filter @fleet/web start -p 3100`, then `pnpm smoke:ui`.

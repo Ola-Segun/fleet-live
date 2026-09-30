@@ -1,5 +1,5 @@
 import { decodeFrame, encodeFrame, type Frame } from "@fleet/protocol";
-import type { Simulation } from "@fleet/sim";
+import type { Simulation, VehicleInfo } from "@fleet/sim";
 import { ReconnectingSocket, type ConnectionStatus, type ReconnectOptions } from "./connection";
 import { Pacer } from "./pacer";
 
@@ -9,6 +9,8 @@ export interface FrameSource {
   start(onFrame: (frame: Frame) => void): void;
   stop(): void;
   status(): ConnectionStatus;
+  /** Plate and driver for every vehicle. Frames carry only ids, so the page needs this once. */
+  vehicles(): Promise<VehicleInfo[]>;
 }
 
 export class SocketSource implements FrameSource {
@@ -29,6 +31,16 @@ export class SocketSource implements FrameSource {
   status(): ConnectionStatus {
     return this.socket ? { ...this.socket.status } : idle("stopped");
   }
+
+  /** The server lists its fleet at `/vehicles` on the same host: ws://host/stream → http://host/vehicles. */
+  async vehicles(): Promise<VehicleInfo[]> {
+    const url = new URL(this.options.url);
+    url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+    url.pathname = "/vehicles";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`vehicle list: HTTP ${res.status}`);
+    return (await res.json()) as VehicleInfo[];
+  }
 }
 
 /**
@@ -47,11 +59,15 @@ export class DemoSource implements FrameSource {
   private lastFrameAt: number | undefined;
 
   constructor(
-    sim: Simulation,
+    private readonly sim: Simulation,
     private readonly now: () => number = Date.now,
     private readonly tickMs = 100,
   ) {
     this.pacer = new Pacer(sim, now);
+  }
+
+  async vehicles(): Promise<VehicleInfo[]> {
+    return this.sim.info();
   }
 
   start(onFrame: (frame: Frame) => void): void {

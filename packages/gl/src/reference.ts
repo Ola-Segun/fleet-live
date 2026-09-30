@@ -1,4 +1,4 @@
-import { FLAG_PARKED, FLOATS_PER_VEHICLE, SAMPLES_PER_VEHICLE } from "./layout";
+import { FLAG_PARKED, FLOATS_PER_VEHICLE, SAMPLES_PER_VEHICLE, fromOffset, slotOffset } from "./layout";
 
 /** Estimate modes as the shader numbers them. Shared with the page's snapshot so both agree. */
 export const MODE_CODES = {
@@ -90,6 +90,45 @@ function lerpHeading32(a: number, b: number, u: number): number {
   const mod = (x: number, y: number) => x - y * Math.floor(x / y);
   const delta = mod(b - a + 540, 360) - 180;
   return f(mod(a + delta * u, 360));
+}
+
+/**
+ * Status groups a dispatcher filters by, as a bit mask over mode codes. The
+ * shader hides any truck whose mode's bit is clear. Filtering costs no CPU,
+ * and the filter applies to exactly what is drawn.
+ */
+export const STATUS_GROUPS = {
+  moving: [MODE_CODES.interpolated, MODE_CODES.extrapolated, MODE_CODES.holding],
+  parked: [MODE_CODES.parked],
+  stale: [MODE_CODES.stale],
+} as const;
+export type StatusGroup = keyof typeof STATUS_GROUPS;
+export const ALL_GROUPS: readonly StatusGroup[] = ["moving", "parked", "stale"];
+
+export function modeMask(groups: readonly StatusGroup[]): number {
+  // "Waiting" trucks (no data yet at the display time) are always shown.
+  let mask = 1 << MODE_CODES.waiting;
+  for (const g of groups) for (const m of STATUS_GROUPS[g]) mask |= 1 << m;
+  return mask;
+}
+
+export const groupOf = (mode: number): StatusGroup | undefined =>
+  ALL_GROUPS.find((g) => (STATUS_GROUPS[g] as readonly number[]).includes(mode));
+
+/**
+ * One truck's position as the GPU draws it, straight from the page's texture
+ * copy. Picking and the follow camera use this, so they agree exactly with the
+ * pixels on screen.
+ */
+export function slotEstimate(
+  data: Float32Array,
+  slot: number,
+  time: number,
+): (Omit<GpuEstimate, "x" | "y"> & { lat: number; lon: number }) | undefined {
+  const e = gpuEstimate(data, slotOffset(slot), time);
+  if (!e) return undefined;
+  const [lat, lon] = fromOffset(e.x, e.y);
+  return { lat, lon, heading: e.heading, mode: e.mode };
 }
 
 export { FLOATS_PER_VEHICLE };

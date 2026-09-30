@@ -59,6 +59,19 @@ export function textureHeight(capacity: number): number {
   return Math.max(1, Math.ceil(capacity / VEHICLES_PER_ROW));
 }
 
+/** Mercator offset from the origin back to [lat, lon]: the inverse of what packVehicle writes. */
+export function fromOffset(dx: number, dy: number): [lat: number, lon: number] {
+  const x = dx + ORIGIN_X;
+  const y = dy + ORIGIN_Y;
+  const lat = (360 / Math.PI) * Math.atan(Math.exp(((180 - y * 360) * Math.PI) / 180)) - 90;
+  return [lat, x * 360 - 180];
+}
+
+/** Where vehicle `slot`'s 36 floats start in a mirror's data array. */
+export function slotOffset(slot: number): number {
+  return (Math.floor(slot / VEHICLES_PER_ROW) * TEXTURE_WIDTH + (slot % VEHICLES_PER_ROW) * TEXELS_PER_VEHICLE) * 4;
+}
+
 /** Texel coordinates of texel `k` of vehicle `slot`. The shader computes the same. */
 export function texelOf(slot: number, k: number): [x: number, y: number] {
   return [(slot % VEHICLES_PER_ROW) * TEXELS_PER_VEHICLE + k, Math.floor(slot / VEHICLES_PER_ROW)];

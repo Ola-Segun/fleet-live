@@ -112,6 +112,9 @@ describe("sim server", () => {
     const lastStatus = posted.filter((m) => m.type === "status").at(-1);
     expect(lastSnapshot?.type === "snapshot" && lastSnapshot.snapshot.count).toBeGreaterThan(100);
     expect(lastStatus?.type === "status" && lastStatus.connection.resumes).toBeGreaterThanOrEqual(3);
+    // Network mode fetches plates and drivers from /vehicles on the socket's host.
+    const list = posted.find((m) => m.type === "vehicles");
+    expect(list?.type === "vehicles" && list.vehicles).toHaveLength(150);
   });
 
   it("closes a client that stops reading, instead of buffering for it forever", { timeout: 30_000 }, async () => {

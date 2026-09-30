@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { VehicleInfo } from "@fleet/sim";
 import type { FleetSnapshot, RowsMessage, WorkerToMain } from "@fleet/transport";
 import { FleetGpuState } from "@/lib/gpu-state";
 import type { FleetConfig, MainToWorker } from "@/lib/worker-messages";
@@ -21,6 +22,8 @@ export type RowsListener = (rows: RowsMessage, receivedAt: number) => void;
 export function useFleet(config: FleetConfig) {
   const [status, setStatus] = useState<FleetStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Plate and driver by vehicle id. Arrives once; the map works with ids until then.
+  const [vehicles, setVehicles] = useState<ReadonlyMap<number, VehicleInfo>>(() => new Map());
   const latest = useRef<FleetSnapshot | null>(null);
   const listeners = useRef(new Set<SnapshotListener>());
   const rowsListeners = useRef(new Set<RowsListener>());
@@ -40,6 +43,10 @@ export function useFleet(config: FleetConfig) {
       } else if (message.type === "snapshot") {
         latest.current = message.snapshot;
         for (const listener of listeners.current) listener(message.snapshot);
+      } else if (message.type === "vehicles") {
+        setVehicles(new Map(message.vehicles.map((v) => [v.id, v])));
+      } else if (message.type === "error") {
+        setError(message.message);
       } else {
         setStatus(message);
       }
@@ -68,5 +75,5 @@ export function useFleet(config: FleetConfig) {
     };
   }, []);
 
-  return { status, error, subscribe, subscribeRows, gpu };
+  return { status, error, subscribe, subscribeRows, gpu, vehicles };
 }

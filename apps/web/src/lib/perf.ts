@@ -19,6 +19,8 @@ export interface FleetPerf {
   longTasks: number[];
   /** WebGL layer only: its live counters (frames, render ms, uploads, context restores). */
   layer?: { frames: number; renderMs: number; uploads: number; contextRestores: number; layersAdded: number; skipped: number };
+  /** How long the last click took to find the truck under it, ms. */
+  lastPickMs?: number;
 }
 
 declare global {
