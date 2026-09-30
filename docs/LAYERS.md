@@ -17,8 +17,8 @@ how it's engineered and proved.
 | 7 | WebGL2 truck layer (`packages/gl`, `apps/web`) | Draws 5,000 moving trucks smoothly, in one draw call | **Done** |
 | 8a | Find, inspect, follow, list (`apps/web`) | What a dispatcher actually uses: search, details, follow, the accessible list | **Done** |
 | 8b | Alerts and geofences (`packages/alerts`, `apps/web`) | Tells the dispatcher what needs attention, instead of making them look | **Done** |
-| 9 | Replay | Answers "what happened at 14:05?" using the same renderer | Next |
-| 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | |
+| 9 | Replay (`packages/replay`, `apps/web`) | Answers "what happened at 14:05?" using the same renderer | **Done** |
+| 10 | Quality gates and ship | Proves all of the above in CI, then publishes it | Next |
 
 ---
 
@@ -1370,5 +1370,176 @@ medians of 5, and the range is across three runs on a noisy laptop.
 - `pnpm --filter @fleet/alerts bench`
 - `pnpm smoke:alerts`
 - `pnpm smoke:ui`
+- `pnpm a11y`
+- `pnpm a11y:contrast`
+
+---
+
+## Layer 9 · Replay
+
+**Why this layer exists**
+
+- **"What happened at 14:05?" is a dispatcher's most common question after
+  "where is it now?".** A truck arrives late, a customer disputes a delivery
+  time, an alert fired while nobody was looking. A live map can't answer any
+  of it, because the past is gone the moment it's drawn.
+- **It has to be the same map.** A separate history viewer would be a second
+  renderer, list and details panel to keep in step with the live ones, and
+  they would drift. The design asked for the whole fleet to rewind "through
+  the same renderer". Here the renderer, list, details panel, picking and
+  follow mode all work in replay, unchanged.
+- **It has to be cheap enough to leave on.** Recording runs all the time,
+  alongside the live map. An hour of it has to fit comfortably in memory, and
+  playing it back at 60× must not cost frames.
+
+**What exists**
+
+| Part | What it does |
+| --- | --- |
+| `packages/replay`: `History` | A ring of frames: every 5 s of display time, every truck's smoothed position (16-bit Mercator), heading, speed and ignition, only if fresh. 7 bytes per truck per frame |
+| `History.plan`, `packInto`, `window` | For a truck and a replay time: which recorded frames to draw it with, how long that stays right, and the GPU row written straight from the frames (`window` gives the same as objects, for tests) |
+| `ReplayView` | Rows for only the trucks whose packed frames no longer cover the replay time. The list's snapshot from those rows, using the shader's algorithm |
+| `FleetCore` | Records a frame whenever display time crosses the 5 s grid. In replay it sends replay rows and snapshots through the same messages, while alerts and recording carry on live. Resends every live row on return |
+| `FleetGpuState.displayTime` | The replay clock while replaying, the live display clock otherwise. The truck layer, picking and follow all read it |
+| `ReplayBar` | Replay, back to live, play/pause, a time slider, and speed 1×, 10× or 60×. On desktop it sits along the bottom of the map, on a phone along the top |
+| Status line, alerts panel, announcements | "Replay 14:05:30" in the status line. "Replaying the map. These alerts are live." on the alerts panel. Entering, catching up and leaving are announced politely |
+| `scripts/smoke-replay.mts` | 11 checks in Chrome, including replay against what the live map actually drew |
+
+**How it is engineered**
+
+| Choice | Why |
+| --- | --- |
+| **Record estimates, not pings** | 5,000 pings a second, late and out of order, would be 18 million records an hour, and replaying them would redo Layer 4. The estimates are already clean, and they are what the dispatcher saw |
+| **Record only fresh estimates** | A stale truck gets no data. In replay the gap shows stale through the shader's own rules, with no replay-specific logic |
+| **5 s frames, 16-bit Mercator** | Chosen by measurement (below): as faithful as 2 s, for 25 MB an hour instead of 63. Mercator, because that's what the texture wants: packing is a multiply, not a logarithm |
+| **The same rows, the same shader** | Replay packs recorded frames into the live texture layout. The shader interpolates them exactly as live, and stale, parked and extrapolated all behave identically |
+| **The list computed from the rows, with the shader's algorithm** | So the list says what the map draws. It costs about 37 ms per snapshot in the Worker (below), which is accepted |
+| **Validity spans** | A truck is repacked only when replay time leaves the span its frames cover: about 930 trucks per tick at 60×, not all 5,000 |
+| **Parked trucks packed up to the replay time** | Found by a test (below) |
+| **One clock, run twice** | The page and the Worker each compute replay time from the same anchor, so scrubbing responds at once on the page, and the Worker picks the rows for the same time |
+| **Alerts stay live** | Replay shows the past; alerts are about now |
+| **No replay time in the URL** | The history is per session (DESIGN.md §7, changed with the reason) |
+
+**Tests** (unit, Node): 222 across the repo, up from 204.
+
+- History:
+  - Positions are stored to within 1.1 m (property).
+  - 8 frames are chosen from one before the replay time, and each choice
+    says how long it holds.
+  - Gaps, skipped frames (a sleeping tab), stale and holding estimates, and
+    ring eviction are all handled.
+  - A frame is due once per interval, and the empty frames a session starts
+    with are skipped.
+  - It costs 7 bytes per truck per frame.
+- **Direct packing matches packVehicle on the same frames.** They agree to
+  1e-9 at 183 moments, for two trucks, in every case: running, gap, parked
+  and before data.
+- A parked truck is drawn parked and packed four times in 140 s, not 28.
+- `ReplayView`:
+  - Positions go through the shader's algorithm.
+  - It repacks only when needed.
+  - A long gap shows stale, and a truck is hidden before its first data.
+  - The list snapshot carries position, speed, age and ignition.
+- `FleetCore`:
+  - It records every 5 s.
+  - Replay rows and snapshots come at the replay time: the whole fleet on
+    entering, nothing while paused.
+  - At the very oldest frame the snapshot isn't empty.
+  - 10× advances 20 s in 2 s.
+  - It resends every live row on return.
+
+**Measured: faithfulness** (`pnpm --filter @fleet/replay evaluate`)
+
+2,000 trucks for 15 minutes from 09:00 Lagos time, through the default
+network chaos and the feed. Replay is compared with the simulator's ground
+truth at each moment, as the shader computes it from the packed rows.
+
+| Recording interval | Memory, 1 h of 5,000 trucks | Moving p50 / p95 / p99 | Parked p50 |
+| --- | --- | --- | --- |
+| Live map at the time (reference) | — | 2.2 / 4.4 / 5.4 m | 1.6 m |
+| 2 s | 63 MB | 2.2 / 4.5 / 5.6 m | 1.8 m |
+| **5 s (chosen)** | **25 MB** | **2.2 / 4.5 / 5.8 m** | **1.8 m** |
+| 10 s | 13 MB | 2.3 / 5.4 / 12.8 m | 1.8 m |
+
+**Measured: in the browser** (`pnpm smoke:replay`, 11/11)
+
+- **Replay matches what the live map drew.** For 20 moving trucks, their
+  live positions were recorded every frame for 25 s, then those moments were
+  replayed: p50 0.9 m, p95 1.3–1.4 m, max 1.9 m, over three runs.
+- **The replay clock is right.** 10× measured 9.9–10.0×. A paused replay
+  stays put.
+- **The worst case stays smooth.** At 60× while jumping back to the oldest
+  frame every 400 ms, repacking every truck on each jump: 59–60 fps, p99
+  frame 16.9–33.3 ms, 0–1 long tasks (at most 54 ms) in 3 s.
+- **Returning to live works.** Catching up with live returns to live and says
+  so. Back to live works, and every tracked truck is drawn live again.
+- **The rest still passes:** `smoke:ui` 18/18 (60 fps, 0 long tasks),
+  `smoke:alerts` 17/17, `smoke:web` 60 fps with context loss recovered.
+- **`a11y`: 0 violations** in 13 states, including replaying in light and dark.
+- **`a11y:contrast`: 0 failures** across about 2,100 elements, replay
+  included.
+
+**Measured: cost** (`pnpm --filter @fleet/replay bench`, 5,000 trucks, one
+run of 5, min / median)
+
+| | First version | Now |
+| --- | --- | --- |
+| Jump: repack every truck | 57 / 74 ms | 11 / 20 ms |
+| 60×, per 100 ms tick (~930 trucks repacked) | 9.0 / 11.8 ms | 2.9 / 3.1 ms |
+| Snapshot for the list | 33 / 49 ms | 26 / 37 ms |
+
+All of this runs in the Worker. The snapshot is the shader's algorithm for
+every truck: about 7% of one Worker core at 2 Hz while replaying.
+
+**Found while building**
+
+1. **Every parked truck replayed as a moving arrow.** Frames are 5 s apart, so
+   replay time almost always falls *between* two samples, and the shader calls
+   that "interpolated". Live never hit this, because parked trackers report
+   every 30 s. A test caught it. A parked truck is now packed only up to the
+   replay time. The first fix made it turn stale after 90 s, because its one
+   sample aged; it's now refreshed every 45 s.
+2. **Jumps took 74 ms.**
+   - Finding a truck's window walked its whole run of data, up to the full
+     hour, both ways.
+   - Packing built sample objects and recomputed Mercator per sample.
+   - The scans are now bounded, frames store Mercator, and rows are written
+     straight from the frames: 20 ms per jump, and 3.1 ms per 60× tick
+     instead of 12.
+   - A test holds the direct packing to `packVehicle`, and the evaluation's
+     accuracy numbers were identical before and after.
+3. **Replay opened on an empty map.** The first frames of a session are
+   recorded before any truck has a fresh estimate. With under five minutes
+   recorded, "five minutes back" landed there, showing "0 trucks". The browser
+   check caught it. Leading empty frames are now skipped, and replay starts
+   halfway back while the history is short.
+4. **Two controls answered to "Speed".** The list's Sort (whose options
+   include Speed) and replay's speed select. The replay control is now
+   "Playback speed", which still contains its visible label, as WCAG 2.5.3
+   asks.
+5. **My browser check was wrong three times.**
+   - It timed 60× with a truck that didn't exist at that moment.
+   - It measured 60× over 3 s when under a minute was recorded, so it
+     reached live in half a second and timed live. The rate is now measured
+     at 10×, and 60× is stressed with repeated jumps.
+   - It looked for moving trucks among the rows on screen under "Needs
+     attention", where there were none. It now sorts by speed first.
+6. **The laptop was already at about 55% CPU** before any check ran: a
+   browser tab running the app. Two sweeps timed out on their first page
+   load and passed on retry.
+
+**Not done here**
+
+- The manual NVDA pass, now steps 1–36 in `docs/a11y/NVDA-CHECKLIST.md`.
+- Replaying alerts: the alert list stays live.
+- Replay time in the URL: it needs server-side history.
+
+**Run it** (with the built app on port 3100):
+
+- `pnpm --filter @fleet/replay evaluate` (about 2 minutes)
+- `pnpm --filter @fleet/replay bench`
+- `pnpm smoke:replay`
+- `pnpm smoke:ui`
+- `pnpm smoke:alerts`
 - `pnpm a11y`
 - `pnpm a11y:contrast`

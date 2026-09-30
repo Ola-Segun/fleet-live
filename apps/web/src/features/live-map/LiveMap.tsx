@@ -177,6 +177,10 @@ export default function LiveMap({ initialCamera, subscribe, gpu, layer, selected
     if (!container.current) return;
     // Start observing before the map exists, so start-up and the no-trucks comparison are both measured.
     const perf = fleetPerf();
+    perf.probe = (id) => {
+      const w = gpu.where(id);
+      return w && gpu.lastDisplay !== undefined ? { at: gpu.lastDisplay, lat: w.lat, lon: w.lon, mode: w.mode } : undefined;
+    };
     const map = new maplibregl.Map({
       container: container.current,
       style: styleUrl(darkAtCreation.current),

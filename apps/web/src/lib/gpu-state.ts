@@ -40,6 +40,13 @@ export class FleetGpuState {
   /** Bumped whenever the alert texture's bytes change, so the layer uploads only then. */
   alertVersion = 0;
   alertCount = 0;
+  /**
+   * Replay (Layer 9): the data time `at` shown at local time `local`
+   * (performance.now()), advancing at `speed` × real time while playing.
+   * While set, it replaces the live display clock for drawing, picking and
+   * following. The Worker runs the same clock to choose which rows to send.
+   */
+  replay: { at: number; local: number; speed: number; playing: boolean } | undefined;
   /** Called after every update, so a mounted layer can ask for a repaint. */
   onChange: (() => void) | undefined;
 
@@ -118,6 +125,18 @@ export class FleetGpuState {
       this.alertVersion++;
     }
     return { data: this.alertBytes, width: VEHICLES_PER_ROW, height, version: this.alertVersion };
+  }
+
+  setReplay(replay: FleetGpuState["replay"]): void {
+    this.replay = replay;
+    this.onChange?.();
+  }
+
+  /** The time to draw at local time `localNow`: the replay clock while replaying, the live display clock otherwise. */
+  displayTime(localNow: number): number | undefined {
+    const r = this.replay;
+    if (r) return r.at + (r.playing ? (localNow - r.local) * r.speed : 0);
+    return this.clock.now(localNow);
   }
 
   setDark(dark: boolean): void {

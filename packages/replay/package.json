@@ -1,0 +1,20 @@
+{
+  "name": "@fleet/replay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "evaluate": "tsx scripts/evaluate.ts",
+    "bench": "tsx scripts/bench.ts"
+  },
+  "dependencies": {
+    "@fleet/feed": "workspace:*",
+    "@fleet/gl": "workspace:*",
+    "@fleet/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@fleet/routes": "workspace:*",
+    "@fleet/sim": "workspace:*"
+  }
+}

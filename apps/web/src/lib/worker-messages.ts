@@ -1,5 +1,5 @@
 import type { ZoneSpec } from "@fleet/alerts";
-import type { WorkerToMain } from "@fleet/transport";
+import type { ReplayRequest, WorkerToMain } from "@fleet/transport";
 
 /** Where the fleet comes from: the simulator in the Worker, or the socket server. */
 export type FleetConfig =
@@ -18,7 +18,10 @@ export type MainToWorker =
   /** The whole zone list, whenever it changes. Kept by the Worker across restarts. */
   | { type: "zones"; zones: ZoneSpec[] }
   | { type: "alert"; action: "acknowledge" | "resolve"; id: number }
-  | { type: "alert"; action: "resolve-cleared" };
+  | { type: "alert"; action: "resolve-cleared" }
+  /** Enter, move or change replay. */
+  | ({ type: "replay" } & ReplayRequest)
+  | { type: "live" };
 
 export type { WorkerToMain };
 

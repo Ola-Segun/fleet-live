@@ -108,6 +108,13 @@ for (const scheme of ["light", "dark"] as const) {
   await p.getByRole("tab", { name: /^Zones/ }).click();
   await p.getByRole("button", { name: "Draw a zone" }).click();
   await scan(p, `desktop, ${scheme}, Zones tab while drawing`);
+  // Layer 9: replaying, with the replay bar's controls.
+  await p.getByRole("button", { name: "Cancel" }).click();
+  await p.waitForFunction(`[...document.querySelectorAll("button")].some((b) => b.textContent === "Replay" && !b.disabled)`, undefined, { timeout: 120_000 });
+  await p.getByRole("button", { name: "Replay", exact: true }).click();
+  await p.getByRole("slider", { name: "Replay time" }).waitFor();
+  await scan(p, `desktop, ${scheme}, replaying`);
+  if (scheme === "light") writeFileSync("docs/a11y/aria-tree-replay.txt", await p.getByRole("group", { name: "Replay" }).ariaSnapshot());
   if (scheme === "light") await p.screenshot({ path: "scripts/a11y-zones.png" });
   await p.context().close();
 }

@@ -69,12 +69,25 @@ time, when speeding happens, so alerts arrive within a minute.
 | 29 | Activate "Finish shape" | Focus goes to "Zone name, edit". Type a name, Tab, choose a kind, activate "Save zone" | | |
 | 30 | Paste `{nope` into "Import GeoJSON", activate "Import pasted" | "That isn't valid JSON." read out without moving focus | | |
 
+### Replay (Layer 9)
+
+Wait a minute after loading, so there is something to replay.
+
+| # | Do this | NVDA should say (roughly) | What it said | OK? |
+| --- | --- | --- | --- | --- |
+| 31 | Find and activate "Replay" (it's after the map region) | "Replay at *hh:mm:ss*, paused. The map, list and details show that time. Alerts stay live." | | |
+| 32 | Tab to the slider | "Replay time, slider, *hh:mm:ss*, *N* s ago" (a time, not a number) | | |
+| 33 | Press Left arrow, then Page Down | The time goes back 5 s, then a minute, read out each time | | |
+| 34 | Tab to "Play", press Space; wait 5 s | "Pause, button"; nothing is read while it plays (the clock isn't a live region) | | |
+| 35 | Tab to "Playback speed", choose 60× | "Playback speed, combo box, 60×"; after a few seconds, "Caught up with live." | | |
+| 36 | Activate "Replay" again, then "Back to live" | "Back to live." | | |
+
 ## What to do with the results
 
 - **Every "OK" is ticked:** write "manual NVDA pass: done (date)" in
-  `docs/LAYERS.md` under Layers 8a and 8b, with the versions tested.
+  `docs/LAYERS.md` under Layers 8a, 8b and 9, with the versions tested.
 - **Something is wrong:** open an issue quoting what NVDA said, and fix it
-  before the Layer 10 release. Items 2, 10, 15, 21, 24 and 25 are the ones
-  automated checks approximate but can't prove.
+  before the Layer 10 release. Items 2, 10, 15, 21, 24, 25 and 34 are the
+  ones automated checks approximate but can't prove.
 - **Known limitation, not a failure:** trucks can't be explored on the map by
   screen reader. The list is the equivalent, per the design (§8).

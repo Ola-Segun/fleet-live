@@ -29,10 +29,11 @@ export interface FleetSnapshot {
   ignition: Uint8Array;
 }
 
-export function buildSnapshot(feed: Feed): FleetSnapshot {
+/** Every truck's estimate at `at`: the display time by default, or another moment still in the feed's window (replay recording). */
+export function buildSnapshot(feed: Feed, at = feed.displayTime()): FleetSnapshot {
   const ids = [...feed.vehicleIds()].sort((a, b) => a - b);
   const n = ids.length;
-  const display = feed.displayTime();
+  const display = at;
   const snap: FleetSnapshot = {
     serverTime: feed.serverTime,
     displayTime: display,

@@ -51,6 +51,14 @@ scope.onmessage = async (event) => {
     core?.setZones(zones);
     return;
   }
+  if (message.type === "replay") {
+    core?.setReplay({ at: message.at, wall: message.wall, speed: message.speed, playing: message.playing });
+    return;
+  }
+  if (message.type === "live") {
+    core?.setReplay(undefined);
+    return;
+  }
   if (message.type === "alert") {
     core?.actOnAlert(message.action, message.action === "resolve-cleared" ? undefined : message.id);
     return;

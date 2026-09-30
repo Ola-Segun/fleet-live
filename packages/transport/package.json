@@ -12,6 +12,7 @@
     "@fleet/routes": "workspace:*",
     "@fleet/sim": "workspace:*",
     "@fleet/gl": "workspace:*",
-    "@fleet/alerts": "workspace:*"
+    "@fleet/alerts": "workspace:*",
+    "@fleet/replay": "workspace:*"
   }
 }

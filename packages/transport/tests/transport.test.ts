@@ -300,6 +300,65 @@ describe("demo source and worker core", () => {
   });
 });
 
+describe("replay in the worker core", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("records every 5 s, serves the history at the replay time through the same messages, and resends every live row after", () => {
+    const sim = new Simulation(lagos, { seed: 7, vehicleCount: 40, startTime: T0 });
+    const posted: WorkerToMain[] = [];
+    const core = new FleetCore(new DemoSource(sim), (message) => posted.push(message));
+    core.start();
+    vi.advanceTimersByTime(90_000);
+    const range = core.history.range()!;
+    expect(core.history.length).toBeGreaterThanOrEqual(16); // ~88 s of display time at one frame per 5 s
+    expect(range.to - range.from).toBeGreaterThanOrEqual(75_000);
+
+    // Paused 40 s after the start of the history.
+    const at = range.from + 40_000;
+    core.setReplay({ at, wall: Date.now(), speed: 1, playing: false });
+    const mark = posted.length;
+    vi.advanceTimersByTime(1000);
+    const after = posted.slice(mark);
+    const rows = after.filter((m) => m.type === "rows");
+    const snapshots = after.filter((m) => m.type === "snapshot");
+    const status = after.filter((m) => m.type === "status").at(-1)!;
+    // Every truck the page knows (a truck whose tracker never reported has no slot) is packed for the new time.
+    const known = rows[0]!.type === "rows" ? rows[0]!.count : NaN;
+    expect(known).toBeGreaterThanOrEqual(38);
+    expect(rows[0]!.type === "rows" && rows[0]!.slots.length).toBe(known);
+    expect(rows.slice(1).every((m) => m.type === "rows" && m.slots.length === 0)).toBe(true); // paused: nothing to repack
+    expect(snapshots.every((m) => m.type === "snapshot" && m.snapshot.displayTime === at)).toBe(true);
+    // The list's snapshot holds the trucks drawn at that time (nearly all of them), not an empty fleet.
+    for (const m of snapshots) expect(m.type === "snapshot" && m.snapshot.count).toBeGreaterThan(known * 0.9);
+
+    // The same at the very oldest frame, where replay starts when less than 5 minutes are recorded.
+    core.setReplay({ at: range.from, wall: Date.now(), speed: 1, playing: false });
+    const edge = posted.length;
+    vi.advanceTimersByTime(1000);
+    for (const m of posted.slice(edge)) if (m.type === "snapshot") expect(m.snapshot.count).toBeGreaterThan(0);
+    expect(status.type === "status" && status.replayAt).toBe(at);
+
+    // Playing at 10×: two seconds later, replay is 20 s further on.
+    core.setReplay({ at, wall: Date.now(), speed: 10, playing: true });
+    vi.advanceTimersByTime(2000);
+    expect(core.replayTime()).toBe(at + 20_000);
+
+    // Back to live: the next rows carry every truck again, and status says live.
+    core.setReplay(undefined);
+    const back = posted.length;
+    vi.advanceTimersByTime(600);
+    core.stop();
+    const liveRows = posted.slice(back).filter((m) => m.type === "rows");
+    expect(liveRows[0]!.type === "rows" && liveRows[0]!.slots.length).toBe(known);
+    const liveStatus = posted.slice(back).filter((m) => m.type === "status").at(-1)!;
+    expect(liveStatus.type === "status" && liveStatus.replayAt).toBeUndefined();
+  });
+});
+
 describe("GPU rows from the worker core", () => {
   beforeEach(() => {
     vi.useFakeTimers();

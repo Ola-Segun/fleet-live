@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { lagosTime } from "@/lib/alert-text";
 import type { FleetStatus, SnapshotListener } from "./use-fleet";
 
 interface Props {
@@ -37,7 +38,7 @@ export function StatusBar({ status, error, subscribe }: Props) {
   }
   if (!status) return <p className="text-sm text-muted">Starting the fleet…</p>;
 
-  const { connection, feed, delayMs, mode } = status;
+  const { connection, feed, delayMs, mode, replayAt } = status;
   const live = connection.state === "open";
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
@@ -52,7 +53,11 @@ export function StatusBar({ status, error, subscribe }: Props) {
         {`Connection ${STATE_LABEL[connection.state].toLowerCase()}`}
       </span>
       <span>{number.format(trucks)} trucks</span>
-      <span>as of {(delayMs / 1000).toFixed(1)} s ago</span>
+      {replayAt === undefined ? (
+        <span>as of {(delayMs / 1000).toFixed(1)} s ago</span>
+      ) : (
+        <span className="rounded bg-accent px-1.5 font-medium text-accent-fg">Replay {lagosTime(replayAt)}</span>
+      )}
       {connection.reconnects > 0 && <span>{connection.reconnects} reconnects</span>}
       {feed.framesMissed > 0 && <span>{number.format(feed.framesMissed)} frames missed</span>}
     </p>
