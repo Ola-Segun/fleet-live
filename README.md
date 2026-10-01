@@ -92,6 +92,10 @@ One layer at a time, each finished, tested and written up before the next:
 why it exists, what it does, how it's engineered, what was measured, and what
 went wrong on the way. That's all in **[docs/LAYERS.md](docs/LAYERS.md)**.
 
+- **All the documentation, with reading paths:** [docs/README.md](docs/README.md).
+  It covers setup, architecture, types, protocol, packages, the web app,
+  configuration, extending, testing, operations, and a production backend
+  guide.
 - **The design:** [DESIGN.md](DESIGN.md).
 - **The decisions:** [docs/adr/](docs/adr/).
 - **A five-minute guided tour:** [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
