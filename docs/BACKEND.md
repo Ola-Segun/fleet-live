@@ -8,6 +8,10 @@ everything behind the WebSocket.
 > the client and a reference relay server (`apps/sim-server`) that serves
 > simulated data in the production wire format. Estimates are marked, and
 > derived from the measured numbers in [LAYERS.md](LAYERS.md).
+>
+> This document covers the technical backend. Product features, hardware,
+> operations, legal and business are in
+> [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md).
 
 ---
 

@@ -9,6 +9,7 @@ Start with the path for what you need. Every document links onward.
 | **Evaluating the project** (a reviewer or interviewer) | [../README.md](../README.md) → [WALKTHROUGH.md](WALKTHROUGH.md) (5 minutes) → [ARCHITECTURE.md](ARCHITECTURE.md) → the ADRs that interest you |
 | **A new developer** | [GETTING-STARTED.md](GETTING-STARTED.md) → [ARCHITECTURE.md](ARCHITECTURE.md) → [PACKAGES.md](PACKAGES.md) → [WEB-APP.md](WEB-APP.md) → [TESTING.md](TESTING.md) |
 | **Building a backend or a data source** | [PROTOCOL.md](PROTOCOL.md) → [TYPES.md](TYPES.md) → [BACKEND.md](BACKEND.md) |
+| **Planning a real product** | [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md) → [BACKEND.md](BACKEND.md) → [ROADMAP.md](ROADMAP.md) |
 | **Changing behaviour** | [EXTENDING.md](EXTENDING.md) → [CONFIGURATION.md](CONFIGURATION.md) → [TESTING.md](TESTING.md) |
 | **Deploying or operating it** | [DEPLOY.md](DEPLOY.md) → [OPERATIONS.md](OPERATIONS.md) → [QUALITY.md](QUALITY.md) |
 
@@ -45,6 +46,7 @@ Start with the path for what you need. Every document links onward.
 | [DEPLOY.md](DEPLOY.md) | Deploying the demo (Vercel or any Next.js host) |
 | [OPERATIONS.md](OPERATIONS.md) | Deployment shapes, running the server in the cloud, CI failures, diagnosing a running app |
 | [BACKEND.md](BACKEND.md) | **Proposal:** from simulation to real trucks: device gateway, message bus, stream service, database schema, API, auth, privacy, server-side alerts, observability, a phased plan |
+| [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md) | **Everything needed to make it a real product:** the minimum sellable product, backend and admin work, customer features (trips, reports, dispatch, driver app), hardware and SIMs, operations, security, Nigerian legal and data protection, business, team, order of work |
 | [ROADMAP.md](ROADMAP.md) | Known limits and what comes next |
 | [WALKTHROUGH.md](WALKTHROUGH.md) | A five-minute guided tour |
 | [a11y/NVDA-CHECKLIST.md](a11y/NVDA-CHECKLIST.md) | The manual screen-reader pass (36 steps) |
