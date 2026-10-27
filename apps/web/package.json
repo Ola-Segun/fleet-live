@@ -10,17 +10,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "16.3.7",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "maplibre-gl": "^5",
     "@fleet/alerts": "workspace:*",
     "@fleet/feed": "workspace:*",
+    "@fleet/gl": "workspace:*",
     "@fleet/protocol": "workspace:*",
     "@fleet/routes": "workspace:*",
     "@fleet/sim": "workspace:*",
     "@fleet/transport": "workspace:*",
-    "@fleet/gl": "workspace:*"
+    "maplibre-gl": "^5",
+    "next": "16.3.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
