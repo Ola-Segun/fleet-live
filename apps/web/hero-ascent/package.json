@@ -1,0 +1,12 @@
+{
+  "name": "fleet-live-hero-ascent-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --target es2020 --moduleResolution bundler --module esnext --lib dom,es2020 --skipLibCheck src/scene.ts src/ascent.ts",
+    "analyze": "node tools/analyze.mjs",
+    "perf": "node tools/perf.mjs",
+    "frame": "node tools/harness.mjs src/scene.ts out/frame 1920 1080 10.24"
+  },
+  "devDependencies": { "canvas": "^3.0.0", "esbuild": "^0.21.0", "typescript": "^5.4.0" }
+}

@@ -1,0 +1,36 @@
+/* ==========================================================================
+   Fleet Live UI: global tokens. Import ONCE (app/layout.tsx):
+     import '@/components/fleet-live-ui/fleet-ui.css';
+   Same material language as the hero and footer: one cool key light from above,
+   1px top highlights, hairline edges, a single lime accent, halftone dots that
+   resolve from noise into signal.
+   ========================================================================== */
+:root {
+  --fl-lime: #b8f23c;
+  --fl-lime-hi: #d6ff70;
+  --fl-lime-lo: #92d11f;
+  --fl-pine: #2b6648;
+
+  --fl-ink-0: #05080f;
+  --fl-ink-1: #080c16;
+  --fl-ink-2: #0c1322;
+  --fl-teal: #0e2234;
+  --fl-paper: #fafbf7;
+  --fl-mist: #f1f4ec;
+
+  --fl-sans: var(--font-sans, 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  --fl-mono: var(--font-mono, 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace);
+  --fl-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Same width and gutters as the hero and footer, so every section shares one left edge. */
+  --fl-shell: 1680px;
+  --fl-gutter: clamp(14px, 1.8vw, 24px);
+  --fl-pad-y: clamp(72px, 9vw, 136px);
+  --fl-r-lg: 22px;
+  --fl-r: 16px;
+  --fl-r-sm: 10px;
+
+  /* Film grain: white speckle for dark surfaces, dark speckle for paper. Tiled once, no filters at runtime. */
+  --fl-grain-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --fl-grain-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}

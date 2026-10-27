@@ -1,0 +1,11 @@
+--- a/FleetLiveHero.tsx	2026-10-27 04:35:59.007164235 +0000
++++ b/FleetLiveHero.tsx	2026-10-27 04:35:59.023546859 +0000
+@@ -217,7 +217,7 @@
+         ref={canvasRef}
+         className={styles.canvas}
+         role="img"
+-        aria-label="Illustrative simulation: noisy vehicle reports pass through a signal dial and emerge as smoother, ordered tracks. A simulated geofence event is highlighted."
++        aria-label="Illustrative simulation: noisy vehicle reports pass through a signal dial, converge, and are launched up a vertical channel as smoother, ordered tracks. A simulated geofence event is highlighted."
+         data-testid="fleet-live-hero-scene"
+       />
+       <div className={styles.scrim} aria-hidden="true" />

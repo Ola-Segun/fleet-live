@@ -10,13 +10,13 @@
    ========================================================================== */
 
 .hero {
-  --bg: #102333;
+  --bg: #080c16;
   --ink: #eef2fa;
   --ink-2: #9aa5bc;
   --ink-3: #6b7690;
-  --lime: #c8ed73;
-  --lime-hi: #d9f59b;
-  --lime-lo: #a8d451;
+  --lime: #b8f23c;
+  --lime-hi: #d6ff70;
+  --lime-lo: #92d11f;
   --line: rgba(255, 255, 255, 0.09);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* Layout: wide content, tight side gutters. Raise --gutter for more air. */
@@ -34,11 +34,12 @@
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(ellipse 42% 48% at 68% 38%, rgba(200, 237, 115, 0.12), transparent 72%),
+    radial-gradient(ellipse 42% 48% at 68% 38%, rgba(200, 237, 115, 0.103), transparent 72%),
     radial-gradient(60% 55% at 72% 40%, rgba(72, 110, 255, 0.1), transparent 70%),
     radial-gradient(45% 40% at 10% 6%, rgba(120, 150, 255, 0.1), transparent 70%),
-    radial-gradient(ellipse 75% 65% at 62% 40%, #1b374a 0%, #102333 68%);
+    radial-gradient(ellipse 75% 65% at 62% 40%, #111b33 0%, #080c16 68%);
 }
+
 
 .hero a:focus-visible {
   outline: 2px solid var(--lime);

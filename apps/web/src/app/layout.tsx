@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "@/components/ui/fleet-live-ui/fleet-ui.css";
 import { THEME_SCRIPT } from "@/lib/theme-setting";
 
 const geistSans = Geist({
@@ -14,8 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fleet Live",
-  description: "A live map of 5,000 simulated trucks on real Lagos roads, drawn smoothly from a GPS feed that arrives late, out of order, twice or not at all.",
+  title: {
+    default: "Fleet Live — Fleet operations, without the noise",
+    template: "%s · Fleet Live",
+  },
+  description:
+    "A real-time fleet operations concept and engineering portfolio project. Explore the platform and try the simulated fleet demo.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -28,9 +34,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         {/* The stored theme onto <html> before the first paint, so a reload never flashes the wrong colours. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Script
+          id="fleet-live-theme-setting"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

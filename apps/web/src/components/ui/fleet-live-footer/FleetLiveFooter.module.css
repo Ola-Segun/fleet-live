@@ -1,0 +1,249 @@
+/* ==========================================================================
+   Fleet Live footer: same material system as the hero.
+   One cool key light from above, 1px top highlights, hairline borders,
+   restrained lime accent. Tokens live on .footer so it can be themed in one place.
+   ========================================================================== */
+
+.footer {
+  --bg: #080c16;
+  --ink: #eef2fa;
+  --ink-2: #9aa5bc;
+  --ink-3: #6b7690;
+  --lime: #b8f23c;
+  --lime-hi: #d6ff70;
+  --lime-lo: #92d11f;
+  --line: rgba(255, 255, 255, 0.09);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sans: var(--font-sans, 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  --mono: var(--font-mono, 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace);
+  /* Match the hero: wide content, tight side gutters. */
+  --shell: 1680px;
+  --gutter: clamp(14px, 1.8vw, 24px);
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-top: 56px;
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(60% 50% at 50% 100%, rgba(184, 242, 60, 0.06), transparent 70%),
+    linear-gradient(180deg, #0a0f1b 0%, #070a13 100%);
+}
+
+/* Machined top edge: a 1px highlight that fades out at both ends. */
+.footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+}
+
+.footer a:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.shell {
+  width: 100%;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ---------- info row (kept compact) ---------- */
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr);
+  gap: 40px 64px;
+  padding-bottom: 0;
+  position: relative;
+  z-index: 1; /* info stays above the dot field */
+}
+
+.brandBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.desc {
+  margin: 0;
+  max-width: 340px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  color: #0b1306;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  background: linear-gradient(180deg, var(--lime-hi) 0%, var(--lime) 48%, var(--lime-lo) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.18),
+    0 10px 24px -8px rgba(184, 242, 60, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.4);
+  transition:
+    transform 0.25s var(--ease),
+    box-shadow 0.25s var(--ease),
+    filter 0.25s;
+}
+
+.btn svg {
+  transition: transform 0.25s var(--ease);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.btn:hover svg {
+  transform: translateX(3px);
+}
+
+/* Pressed: the key sinks into the panel. */
+.btn:active {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 6px -2px rgba(184, 242, 60, 0.25);
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  justify-self: end;
+  width: min(100%, 520px);
+}
+
+.colTitle {
+  margin: 0 0 12px;
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  position: relative;
+  display: inline-block;
+  padding: 5px 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+/* Underline wipes in from the left on hover. */
+.link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 1px;
+  background: var(--lime);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s var(--ease);
+}
+
+.link:hover {
+  color: var(--ink);
+}
+
+.link:hover::after {
+  transform: scaleX(1);
+}
+
+/* ---------- dot wordmark (sits flush on the page's bottom edge) ---------- */
+
+.mark {
+  position: relative;
+  z-index: 0;
+  padding-bottom: 0;
+  /* The dot field's headroom tucks behind the bottom of the info row (set from JS). */
+  margin-top: calc(var(--lift, 0px) * -1);
+  pointer-events: none;
+}
+
+.wrap {
+  position: relative;
+  width: 100%;
+  min-height: 96px;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---------- phones ---------- */
+
+@media (max-width: 819px) {
+  .footer {
+    padding-top: 44px;
+  }
+  .top {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding-bottom: 28px;
+  }
+  .cols {
+    justify-self: stretch;
+    width: 100%;
+    gap: 24px;
+  }
+  .wrap {
+    min-height: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn svg,
+  .link,
+  .link::after {
+    transition: none;
+  }
+}

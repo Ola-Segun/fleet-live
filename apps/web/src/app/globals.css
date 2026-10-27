@@ -31,6 +31,15 @@
   --danger: #b91c1c;
   --live: #059669;
   --warn: #d97706;
+  --brand-ink: #102333;
+  --brand-ink-soft: #1b374a;
+  --brand-paper: #f5f7f3;
+  --brand-line: #dfe5df;
+  --brand-muted: #56666d;
+  --brand-green: #386b51;
+  --brand-lime: #c8ed73;
+  --brand-lime-hover: #d9f59b;
+  --brand-tint: #edf4e9;
 }
 
 /*
@@ -94,6 +103,15 @@
   --color-danger: var(--danger);
   --color-live: var(--live);
   --color-warn: var(--warn);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-ink-soft: var(--brand-ink-soft);
+  --color-brand-paper: var(--brand-paper);
+  --color-brand-line: var(--brand-line);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-green: var(--brand-green);
+  --color-brand-lime: var(--brand-lime);
+  --color-brand-lime-hover: var(--brand-lime-hover);
+  --color-brand-tint: var(--brand-tint);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -102,4 +120,29 @@ body {
   background: var(--page);
   color: var(--text);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.shader-background {
+  background-color: transparent;
+  background-image:
+    radial-gradient(circle, rgba(217, 245, 155, 0.8) 0.6px, transparent 0.9px),
+    radial-gradient(ellipse at 78% 20%, rgba(200, 237, 115, 0.55), transparent 58%),
+    radial-gradient(ellipse at 20% 82%, rgba(95, 150, 168, 0.45), transparent 62%);
+  background-position: 0 0, center, center;
+  background-size: 5px 5px, 100% 100%, 100% 100%;
+}
+
+::selection {
+  background: var(--brand-lime);
+  color: var(--brand-ink);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

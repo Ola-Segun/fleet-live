@@ -1,0 +1,237 @@
+--- a/scene.ts	2026-10-26 08:10:10.375116000 +0000
++++ b/scene.ts	2026-10-27 04:29:10.561114734 +0000
+@@ -13,9 +13,14 @@
+  * signal touches the dial, that lane's index lights up and the nearby
+  * ticks thicken and glow, then fade.
+  *
+- * Tune the look from the CONFIG block below.
++ * Past the dial the lanes converge, brake into a bend and climb a vertical
++ * launch channel (see ascent.ts), accelerating as they go.
++ *
++ * Tune the look from the CONFIG block below (and ASCENT in ascent.ts).
+  */
+ 
++import { Ascent, type AgentState, type AscentConfig, type AscentFrame } from './ascent';
++
+ export type Counters = [number, number, number];
+ export interface SceneAnchors {
+   /** Y position (px, relative to the hero) of the horizon / vanishing point. */
+@@ -36,6 +41,8 @@
+   onAnchors?: (a: SceneAnchors) => void;
+   /** Canvas factory for sprites/offscreen buffers. Override for tests or workers. */
+   makeCanvas?: () => HTMLCanvasElement;
++  /** Overrides for the launch channel (see ASCENT in ascent.ts). */
++  ascent?: Partial<AscentConfig>;
+ }
+ 
+ /* ------------------------------ CONFIG ------------------------------ */
+@@ -107,6 +114,12 @@
+   a: Agent;
+   u: number;
+   d: number;
++  /** True while the vehicle is on the vertical climb. */
++  asc: boolean;
++  /** Climb time fraction 0..1. */
++  x: number;
++  /** Stable index, for per-vehicle edge detection. */
++  i: number;
+ }
+ 
+ function comparePlacedByDepth(a: Placed, b: Placed): number {
+@@ -159,6 +172,10 @@
+   private readonly gAmber: HTMLCanvasElement;
+   private readonly beam: HTMLCanvasElement;
+   private readonly curtain: HTMLCanvasElement;
++  private readonly asc: Ascent;
++  private phased = false;
++  private readonly af: AscentFrame;
++  private readonly ast: AgentState = { ascending: false, u: 0, x: 0 };
+   private readonly onCounters?: (v: Counters) => void;
+   private readonly onAnchors?: (a: SceneAnchors) => void;
+ 
+@@ -223,6 +240,17 @@
+     this.gAmber = this.radial(AMBER);
+     this.beam = this.makeBeam();
+     this.curtain = this.makeCurtain();
++    this.asc = new Ascent({ dMin: DMIN, dMax: DMAX, dialBack: DB, makeCanvas: this.mk, config: opts.ascent });
++    this.af = {
++      W: 0, H: 0, VX: 0, VY: 0, F: 0, Fe: 0, T: 0, IN: 1, dt: 0, small: false, scroll: 0, rm: this.rm, top: -30,
++      proj: (z, y, d, o) => {
++        const s = this.Fe / d;
++        o.x = this.VX + (z - this.cz) * s;
++        o.y = this.VY + (this.ch - y) * s;
++        o.s = s;
++      },
++      laneZ: (l, d) => this.laneZ(l, d, this.T),
++    };
+   }
+ 
+   /* ------------------------------ public API ------------------------------ */
+@@ -268,13 +296,15 @@
+       const v = (i / (n - 1)) * 2 - 1;
+       return { i, v, z0: this.zc + v * this.zh, lime: i % 3 === 0, lit: 0, litE: 0 };
+     });
++    this.asc.setLanes(this.lanes, this.zh, this.pad);
++    this.phased = false;
+     this.agents = [];
+     for (const lane of this.lanes) {
+       for (let k = 0; k < per; k++) {
+         this.agents.push({
+           lane,
+           u: (k + hash(lane.i, k)) / per,
+-          sp: 0.045 + hash(lane.i, k + 9) * 0.02,
++          sp: 0.054, // one shared rate keeps launches evenly spread for as long as the page is open
+           seed: lane.i * 31 + k * 7,
+           pf: null,
+         });
+@@ -291,7 +321,7 @@
+     this.atmosphereHorizon.addColorStop(0, `rgba(${COOL},0)`);
+     this.atmosphereHorizon.addColorStop(0.5, `rgba(${COOL},.18)`);
+     this.atmosphereHorizon.addColorStop(1, `rgba(${COOL},0)`);
+-    this.placed = this.agents.map((a) => ({ a, u: 0, d: 0 }));
++    this.placed = this.agents.map((a, i) => ({ a, u: 0, d: 0, asc: false, x: 0, i }));
+     this.onAnchors?.({
+       horizonY: this.VY,
+       dialCenterX: this.VX + (this.zc * this.F) / DF,
+@@ -392,15 +422,27 @@
+     ctx.globalCompositeOperation = 'source-over';
+ 
+     this.drawAtmosphere();
+-    this.drawRails();
++    const af = this.af;
++    af.W = this.W; af.H = this.H; af.VX = this.VX; af.VY = this.VY; af.F = this.F; af.Fe = this.Fe;
++    af.T = this.T; af.IN = this.IN; af.dt = rm ? 0 : dt; af.small = this.small; af.scroll = this.scroll; af.rm = rm;
++    af.top = this.small ? Math.max(-30, this.VY - this.H * 0.24) : -30;
++    this.asc.frame(af);
++    if (!this.phased) {
++      this.asc.stratify(this.agents);
++      this.phased = true;
++    }
++    this.asc.drawBack(ctx, this.lanes);
+ 
+     for (let i = 0; i < this.agents.length; i++) {
+       const a = this.agents[i]!;
+-      const u = (a.u + t * a.sp) % 1;
++      const st = this.ast;
++      this.asc.state(a.u, a.sp, t, st);
+       const placed = this.placed[i]!;
+       placed.a = a;
+-      placed.u = u;
+-      placed.d = dOf(u);
++      placed.u = st.u;
++      placed.asc = st.ascending;
++      placed.x = st.x;
++      placed.d = st.ascending ? 1e6 : dOf(st.u);
+     }
+     const list = this.placed;
+     list.sort(comparePlacedByDepth);
+@@ -417,6 +459,7 @@
+     this.drawDial();
+     for (const o of list) if (o.d <= DB) this.drawAgent(o);
+ 
++    this.asc.drawFront(ctx);
+     this.drawAlertOverlay();
+     ctx.globalAlpha = 1;
+     ctx.globalCompositeOperation = 'source-over';
+@@ -436,7 +479,7 @@
+     this.ps = s;
+   }
+ 
+-  private laneZ(l: Lane, d: number, t: number): number {
++  private laneZ(l: { i: number; v: number }, d: number, t: number): number {
+     const far = ss(DB, DMAX * 0.6, d);
+     const wob = d < DF ? 1.5 * (1 - ss(DF - 1.6, DF, d)) : d < DB ? 0 : 0.3 * ss(DB, DB + 5, d);
+     const w = Math.sin(d * 0.55 + l.i * 1.7 + t * 0.3) * 0.07 + Math.sin(d * 0.23 - l.i + t * 0.18) * 0.12;
+@@ -537,30 +580,6 @@
+     ctx.globalCompositeOperation = 'source-over';
+   }
+ 
+-  /** Smooth lane guides that start at the back of the dial and run to the horizon. */
+-  private drawRails(): void {
+-    const { ctx } = this;
+-    const yD = this.VY + (this.ch * this.Fe) / DB;
+-    const g = ctx.createLinearGradient(0, this.VY, 0, yD);
+-    g.addColorStop(0, `rgba(${COOL},0)`);
+-    g.addColorStop(1, `rgba(${COOL},.5)`);
+-    ctx.lineWidth = 1.2;
+-    for (const l of this.lanes) {
+-      ctx.strokeStyle = g;
+-      ctx.globalAlpha = this.IN * clamp(0.55 + l.lit * 0.9, 0, 1);
+-      ctx.beginPath();
+-      const steps = this.small ? 18 : 14;
+-      for (let i = 0; i <= steps; i++) {
+-        const d = dOf(UB + ((1 - UB) * i) / steps);
+-        this.proj(this.laneZ(l, d, this.T), 0, d);
+-        if (i) ctx.lineTo(this.px, this.py);
+-        else ctx.moveTo(this.px, this.py);
+-      }
+-      ctx.stroke();
+-    }
+-    ctx.globalAlpha = this.IN;
+-  }
+-
+   /**
+    * The signal dial: a thick glass-and-metal slab spanning every lane.
+    * Drawn into an offscreen buffer so its ends can be darkened and faded
+@@ -849,13 +868,22 @@
+     ctx.globalCompositeOperation = 'source-over';
+   }
+ 
++  /** Ground brightness: eases down with distance but stays readable all the way to the bend. */
++  private groundVis(d: number): number {
++    return 1 - 0.5 * ss(14, this.asc.bendDepth, d);
++  }
++
+   private drawAgent(o: Placed): void {
+     const { ctx } = this;
+     const a = o.a;
+     const u = o.u;
+     const d = o.d;
+     const lane = a.lane;
+-    const vis = (1 - ss(16, DMAX * 0.92, d)) * ss(DMIN, DMIN + 0.8, d);
++    if (o.asc) {
++      this.asc.drawHead(ctx, o.i, lane, o.x, this.groundVis(this.asc.bendDepth), this.gCool, this.gLime);
++      return;
++    }
++    const vis = this.groundVis(d) * ss(DMIN, DMIN + 0.8, d);
+     if (vis < 0.01) return;
+     const z = this.laneZ(lane, d, this.T);
+     this.proj(z, 0.05, d);
+@@ -993,10 +1021,16 @@
+ 
+   /* ------------------------------ alert system ------------------------------ */
+ 
++  /** Log-depth of a vehicle at time t (ground only; clamps to the bend while climbing). */
++  private stateU(a: Agent, t: number): number {
++    const st: AgentState = { ascending: false, u: 0, x: 0 };
++    this.asc.state(a.u, a.sp, t, st);
++    return st.u;
++  }
++
+   private startAlert(a: Agent, t0: number): void {
+-    const u0 = (a.u + t0 * a.sp) % 1;
+-    const dC = dOf(u0 + a.sp * 0.35); // the vehicle reaches the zone centre quickly...
+-    const Rd = dOf(u0 + a.sp * ALERT.exit) - dC; // ...and leaves its far boundary at ALERT.exit
++    const dC = dOf(this.stateU(a, t0 + 0.35)); // the vehicle reaches the zone centre quickly...
++    const Rd = dOf(this.stateU(a, t0 + ALERT.exit)) - dC; // ...and leaves its far boundary at ALERT.exit
+     this.alert = {
+       agent: a,
+       t0,
+@@ -1015,7 +1049,7 @@
+       if (!this.alert) {
+         let count = 0;
+         for (const o of list) {
+-          const d0 = dOf((o.a.u + t0 * o.a.sp) % 1);
++          const d0 = dOf(this.stateU(o.a, t0));
+           if (d0 > 9.4 && d0 < 10.8) count++;
+         }
+         if (count) {
+@@ -1132,7 +1166,7 @@
+     if (tt < ALERT.exit - 0.1) return;
+     const { ctx } = this;
+     const a = al.agent;
+-    const d = dOf((a.u + this.T * a.sp) % 1);
++    const d = dOf(this.stateU(a, this.T));
+     this.proj(this.laneZ(a.lane, d, this.T), 0.05, d);
+     const x = this.px;
+     const y = this.py;
