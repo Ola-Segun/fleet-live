@@ -35,6 +35,21 @@ jobs:
       - run: pnpm --filter @fleet/web build
       - run: pnpm bundle:size
 
+  cloudflare:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @fleet/web cf:build
+      - run: pnpm --filter @fleet/web exec wrangler deploy --dry-run
+
   browser:
     needs: check
     runs-on: ubuntu-latest
