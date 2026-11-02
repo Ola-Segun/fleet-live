@@ -4,7 +4,7 @@ import DitheredShaderBackground from "@/components/ui/dithered-shader-background
 import { Header } from "@/components/ui/header-2";
 import { siteNavigation } from "@/components/ui/site-navigation";
 import { FleetLiveFooter } from "@/components/ui/fleet-live-footer";
-import { FleetUIProvider } from "@/components/ui/fleet-live-ui";
+import { SiteDemoLaunchFlow } from "./site-demo-launch-flow";
 
 export { Brand } from "@/components/ui/header-2";
 
@@ -29,14 +29,14 @@ export function SiteFooter() {
 
 export function SiteShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-brand-paper text-brand-ink">
+    <SiteDemoLaunchFlow>
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand-lime focus:px-4 focus:py-2 focus:text-brand-ink">
         Skip to content
       </a>
       <Header />
-      <FleetUIProvider>{children}</FleetUIProvider>
+      {children}
       <SiteFooter />
-    </div>
+    </SiteDemoLaunchFlow>
   );
 }
 
@@ -69,7 +69,7 @@ export function SiteHero({
         className="pointer-events-none absolute inset-0 -z-10"
         style={{ background: "radial-gradient(ellipse 42% 60% at 90% 16%, rgba(74,116,83,.3), transparent), radial-gradient(ellipse 40% 45% at 7% 85%, rgba(38,84,110,.24), transparent)" }}
       />
-      <DitheredShaderBackground scale={scale} />
+      <DitheredShaderBackground scale={scale} pauseWhenHidden />
       <div className={`relative z-10 mx-auto w-full max-w-[90rem] px-5 sm:px-6 ${spacing} ${className}`}>
         {children}
       </div>

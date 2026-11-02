@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:web": "tsx scripts/smoke-web.mts",
+    "smoke:site": "tsx scripts/smoke-site.mts",
     "smoke:ui": "tsx scripts/smoke-ui.mts",
     "a11y": "tsx scripts/a11y.mts",
     "a11y:contrast": "tsx scripts/contrast.mts",
@@ -18,7 +19,7 @@
     "smoke:replay": "tsx scripts/smoke-replay.mts",
     "lint": "pnpm --filter @fleet/web lint",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "smoke:all": "pnpm smoke:web && pnpm smoke:ui && pnpm smoke:alerts && pnpm smoke:replay && pnpm a11y && pnpm a11y:contrast",
+    "smoke:all": "pnpm smoke:site && pnpm smoke:web && pnpm smoke:ui && pnpm smoke:alerts && pnpm smoke:replay && pnpm a11y && pnpm a11y:contrast",
     "profile:frames": "tsx scripts/profile-frames.mts",
     "bundle:size": "tsx scripts/bundle-size.mts",
     "screenshots": "tsx scripts/screenshots.mts"

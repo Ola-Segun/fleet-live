@@ -8,9 +8,9 @@
  *   pnpm smoke:ui
  */
 import type { Page } from "@playwright/test";
-import { BASE_URL, READY_MS, SOFTWARE_TIMING, launchBrowser, timing } from "./browser.mts";
+import { DEMO_URL, READY_MS, SOFTWARE_TIMING, launchBrowser, timing } from "./browser.mts";
 
-const base = BASE_URL;
+const base = DEMO_URL;
 const browser = await launchBrowser();
 const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => results.push([name, ok, detail]);

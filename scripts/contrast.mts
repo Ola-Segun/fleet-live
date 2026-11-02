@@ -9,7 +9,7 @@
  *
  *   pnpm a11y:contrast   (with the built app on port 3100)
  */
-import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
+import { DEMO_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 
 const MEASURE = `(() => {
     const cv = document.createElement("canvas"); cv.width = cv.height = 1; const cx = cv.getContext("2d", { willReadFrequently: true });
@@ -53,7 +53,7 @@ const combos = (["light", "dark"] as const).flatMap((scheme) =>
 );
 for (const [label, viewport, mobile, colorScheme] of combos) {
   const page = await (await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, colorScheme })).newPage();
-  await page.goto(`${BASE_URL}?at=2230`);
+  await page.goto(`${DEMO_URL}?at=2230`);
   await page.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: READY_MS });
   if (mobile) await page.getByRole("button", { name: /^Show trucks/ }).tap();
   await page.waitForSelector('[role="option"]');

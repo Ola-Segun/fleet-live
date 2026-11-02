@@ -58,7 +58,7 @@ export default function EngineeringPage() {
             }))}
           />
         </Section>
-        <Section tone="paper" edge layout="split" title="Keep the result stable when the network is not.">
+        <Section tone="paper" layout="split" title="Keep the result stable when the network is not.">
           <TwoUp
             left={
               <Principles

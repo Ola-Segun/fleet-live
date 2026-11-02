@@ -34,19 +34,21 @@ source.
 > **Windows:** run the commands in PowerShell or Git Bash. If an install
 > stalls, run `pnpm install --reporter=append-only` to see progress.
 
-## 3 · Run the dashboard (demo mode)
+## 3 · Run the product site and console (demo mode)
 
 ```sh
 pnpm --filter @fleet/web dev
 ```
 
-Open <http://localhost:3000>. In demo mode the simulator runs inside the
-browser's Worker. It warms up 30 simulated seconds, then 5,000 trucks start
-moving, about 4 seconds after the page opens.
+Open <http://localhost:3000> for the public product site, then choose **Open
+interactive demo** or go directly to <http://localhost:3000/app> for the
+dispatcher console. In demo mode the simulator runs inside the browser's
+Worker. It warms up 30 simulated seconds, then 5,000 trucks start moving,
+about 4 seconds after the console opens.
 
 Try:
 
-- `http://localhost:3000/?at=2230`: night-time roads, so speeding alerts
+- `http://localhost:3000/app?at=2230`: night-time roads, so speeding alerts
   arrive within a minute;
 - `?hud=1`: the performance overlay;
 - the Dark mode button, top left;
@@ -60,8 +62,10 @@ The browser checks run against this, and so does what a deploy runs:
 
 ```sh
 pnpm --filter @fleet/web build
-pnpm --filter @fleet/web start -p 3100     # http://127.0.0.1:3100
+pnpm --filter @fleet/web start -p 3100     # public site: http://127.0.0.1:3100
 ```
+
+The interactive console is at <http://127.0.0.1:3100/app>.
 
 ## 4 · Run with a server (network mode)
 
@@ -77,7 +81,7 @@ pnpm --filter @fleet/web dev
 ```
 
 Then open
-<http://localhost:3000/?mode=network&ws=ws://127.0.0.1:8787/stream>.
+<http://localhost:3000/app?mode=network&ws=ws://127.0.0.1:8787/stream>.
 
 To see the reconnect logic at work, drop every client every 20 s:
 

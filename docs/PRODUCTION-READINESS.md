@@ -6,6 +6,8 @@ hardware, operations, security, legal and business.
 
 - **Technical detail for the backend:** [BACKEND.md](BACKEND.md). This
   document links to it rather than repeating it.
+- **The market:** [MARKET.md](MARKET.md) covers competitors, prices, the
+  edge to sell on, and how each phase below would do.
 - **Status:** a planning checklist. None of the work below is built. Sizes
   are relative (S, M, L, XL), not time estimates: duration depends on the
   team.

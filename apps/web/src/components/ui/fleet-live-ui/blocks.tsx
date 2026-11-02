@@ -1,8 +1,10 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import s from './fleet-ui.module.css';
-import { Button, Led, Panel, SettleText, cx, cssVars } from './primitives';
+import { Button } from './button';
+import { Led, Panel } from './primitives';
+import { SettleText } from './settle-text';
+import { TimelineProgress } from './timeline-progress';
+import { cssVars, cx } from './utils';
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
@@ -94,7 +96,7 @@ export function FlowRail({ label, title, stages }: { label?: string; title?: str
           {title && <h3 className={s.mTitle}>{title}</h3>}
         </div>
       )}
-      <div className={s.flow}>
+      <div className={s.flow} style={cssVars({ '--flow-columns': Math.min(stages.length, 4) })}>
         <i className={s.bus} aria-hidden="true" />
         {stages.map((st, i) => (
           <div key={st.title} className={s.stageWrap}>
@@ -222,26 +224,15 @@ export interface TimelineItem {
   chips?: string[];
 }
 
-const NODE: Record<Phase, string | undefined> = {
-  current: s.nodeCurrent,
-  next: s.nodeNext,
-  later: undefined,
-  future: s.nodeFuture,
-};
-
 export function Timeline({ items }: { items: TimelineItem[] }) {
   if (items.length === 0) return null;
   const cur = items.findIndex((i) => i.status === 'current');
-  const fill = cur < 0 ? '0%' : `${((cur + 0.5) / items.length) * 100}%`;
+  const initialIndex = cur < 0 ? 0 : cur;
   return (
-    <div className={s.tl} style={cssVars({ '--fill': fill })}>
-      <i className={s.rail} aria-hidden="true" />
+    <TimelineProgress initialIndex={initialIndex}>
       {items.map((it, i) => (
-        <div key={it.title} className={s.tlRow}>
-          <span className={cx(s.tlNode, NODE[it.status])} aria-hidden="true">
-            {pad2(i + 1)}
-          </span>
-          <Panel lit={it.status === 'current'} kicker={it.kicker} title={it.title}>
+        <div key={it.title} className={s.tlRow} data-timeline-row data-active={initialIndex === i} data-timeline-index={i}>
+          <Panel className={initialIndex === i ? s.lit : undefined} kicker={it.kicker} title={it.title}>
             <p>{it.body}</p>
             {it.chips && (
               <div className={s.chips}>
@@ -253,7 +244,7 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
           </Panel>
         </div>
       ))}
-    </div>
+    </TimelineProgress>
   );
 }
 

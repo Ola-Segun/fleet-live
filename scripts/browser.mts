@@ -19,6 +19,9 @@ import { chromium, type Browser } from "@playwright/test";
 /** The built app, started with `pnpm --filter @fleet/web start -p 3100`. */
 export const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3100/";
 
+/** The interactive fleet console is served separately from the public product site. */
+export const DEMO_URL = new URL("/app", BASE_URL).toString();
+
 /** Timing isn't gated: CI, or software WebGL forced locally. */
 export const SOFTWARE_TIMING = Boolean(process.env.CI || process.env.SOFTWARE_GL);
 

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PageIntro, SiteShell } from "@/components/site-shell";
 import { CtaPanel, Section, SpecSheet } from "@/components/ui/fleet-live-ui";
 
@@ -72,11 +71,6 @@ export default function UseCasesPage() {
             action={{ label: "View the roadmap", href: "/product-direction" }}
           />
         </Section>
-        <section className="px-5 py-10 sm:px-6">
-          <div className="mx-auto max-w-[90rem]">
-            <Link href="/engineering" className="text-sm font-medium text-brand-green hover:underline">Explore the engineering case study →</Link>
-          </div>
-        </section>
       </main>
     </SiteShell>
   );

@@ -99,6 +99,7 @@ void main() {
 type Props = {
   className?: string;
   scale?: number;
+  pauseWhenHidden?: boolean;
 };
 
 function compileShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
@@ -115,7 +116,11 @@ function compileShader(gl: WebGLRenderingContext, type: number, source: string):
   return shader;
 }
 
-export default function DitheredShaderBackground({ className = "", scale = 0.5 }: Props) {
+export default function DitheredShaderBackground({
+  className = "",
+  scale = 0.5,
+  pauseWhenHidden = false,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -142,7 +147,9 @@ export default function DitheredShaderBackground({ className = "", scale = 0.5 }
     let frameId = 0;
     let previousFrame = 0;
     let disposed = false;
+    let visible = !pauseWhenHidden;
     let resizeObserver: ResizeObserver | undefined;
+    let intersectionObserver: IntersectionObserver | undefined;
     let vertex: WebGLShader | undefined;
     let fragment: WebGLShader | undefined;
 
@@ -202,40 +209,80 @@ export default function DitheredShaderBackground({ className = "", scale = 0.5 }
       resize();
 
       const draw = (now: number) => {
-        if (disposed) return;
+        frameId = 0;
+        if (
+          disposed ||
+          (pauseWhenHidden && (!visible || document.hidden)) ||
+          motionPreference.matches
+        ) return;
+        if (now - previousFrame >= 50) {
+          previousFrame = now;
+          gl.useProgram(program);
+          gl.uniform2f(resolution, canvas.width, canvas.height);
+          gl.uniform1f(time, now / 1000);
+          gl.uniform1f(shaderScale, scale);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          canvas.dataset.shaderState = "rendered";
+        }
         frameId = window.requestAnimationFrame(draw);
-        if (now - previousFrame < 50) return;
-        previousFrame = now;
-
-        gl.useProgram(program);
-        gl.uniform2f(resolution, canvas.width, canvas.height);
-        gl.uniform1f(time, now / 1000);
-        gl.uniform1f(shaderScale, scale);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        canvas.dataset.shaderState = "rendered";
       };
+
+      const start = () => {
+        if (
+          !frameId &&
+          (!pauseWhenHidden || (visible && !document.hidden)) &&
+          !motionPreference.matches
+        ) {
+          if (canvas.dataset.shaderState === "paused") canvas.dataset.shaderState = "ready";
+          frameId = window.requestAnimationFrame(draw);
+        }
+      };
+      const stop = () => {
+        if (frameId) {
+          window.cancelAnimationFrame(frameId);
+          frameId = 0;
+        }
+        if (pauseWhenHidden && canvas.dataset.shaderState !== "reduced-motion") {
+          canvas.dataset.shaderState = "paused";
+        }
+      };
+      const handleVisibilityChange = () => {
+        if (document.hidden) stop();
+        else start();
+      };
+      if (pauseWhenHidden) {
+        intersectionObserver = new IntersectionObserver(([entry]) => {
+          visible = Boolean(entry?.isIntersecting);
+          if (visible) start();
+          else stop();
+        });
+        intersectionObserver.observe(canvas);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+      }
 
       const handleMotionChange = () => {
         if (motionPreference.matches) {
-          window.cancelAnimationFrame(frameId);
+          stop();
           gl.clearColor(0, 0, 0, 0);
           gl.clear(gl.COLOR_BUFFER_BIT);
           canvas.dataset.shaderState = "reduced-motion";
         } else {
           previousFrame = 0;
-          canvas.dataset.shaderState = "ready";
-          frameId = window.requestAnimationFrame(draw);
+          canvas.dataset.shaderState = pauseWhenHidden && !visible ? "paused" : "ready";
+          start();
         }
       };
 
       canvas.dataset.shaderState = "ready";
-      frameId = window.requestAnimationFrame(draw);
       motionPreference.addEventListener("change", handleMotionChange);
+      if (!pauseWhenHidden) frameId = window.requestAnimationFrame(draw);
 
       return () => {
         disposed = true;
-        window.cancelAnimationFrame(frameId);
+        stop();
         resizeObserver?.disconnect();
+        intersectionObserver?.disconnect();
+        if (pauseWhenHidden) document.removeEventListener("visibilitychange", handleVisibilityChange);
         motionPreference.removeEventListener("change", handleMotionChange);
         if (buffer) gl.deleteBuffer(buffer);
         if (program) gl.deleteProgram(program);
@@ -247,13 +294,14 @@ export default function DitheredShaderBackground({ className = "", scale = 0.5 }
       if (buffer) gl.deleteBuffer(buffer);
       if (program) gl.deleteProgram(program);
     }
-  }, [scale]);
+  }, [pauseWhenHidden, scale]);
 
   return (
     <div
       className={`shader-background pointer-events-none absolute inset-0 overflow-hidden opacity-[0.08] mix-blend-screen ${className}`}
       aria-hidden="true"
       data-testid="dithered-shader-background"
+      data-pause-when-hidden={pauseWhenHidden ? "true" : "false"}
     >
       <canvas ref={canvasRef} className="absolute inset-0 size-full" data-testid="dithered-shader-canvas" />
     </div>

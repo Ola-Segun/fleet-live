@@ -12,8 +12,8 @@ what you heard.
 
 1. Install NVDA (free) from <https://www.nvaccess.org/download/>.
 2. Run the app: `pnpm --filter @fleet/web build`, then
-   `pnpm --filter @fleet/web start -p 3100`. Open <http://127.0.0.1:3100/> in
-   Chrome.
+   `pnpm --filter @fleet/web start -p 3100`. Open
+   <http://127.0.0.1:3100/app> in Chrome.
 3. Start NVDA (Ctrl+Alt+N).
    - The NVDA key is **Insert**, or Caps Lock if you chose that.
    - **Browse mode** reads the page, and letters jump between elements.
@@ -32,7 +32,7 @@ Tester ______
 | --- | --- | --- | --- | --- |
 | 1 | Load the page, wait 5 s, then press NVDA+F7 → Landmarks | Landmarks: banner, complementary, main; regions "Fleet" and "Map of the fleet" | | |
 | 2 | Listen for 30 s without touching anything | "Connection live" **once**, then **silence**. Anything read repeatedly (counts, "as of…") is a failure | | |
-| 3 | Press H | "Fleet Live, heading level 1" | | |
+| 3 | Press H | "Fleet Live Demo, heading level 1" | | |
 | 4 | Ctrl+Home, then Tab once | "Skip to the side panel, link" | | |
 | 5 | Press Enter, then Tab twice | "Trucks, tab, selected", then "Search trucks by plate or driver, edit, search" (focus mode) | | |
 | 6 | Type `kja`, then pause 1 s | After the pause: "*N* trucks shown" | | |
@@ -53,7 +53,7 @@ Tester ______
 
 ### Alerts and zones (Layer 8b)
 
-Open <http://127.0.0.1:3100/?at=2230>. The demo then starts at 22:30 Lagos
+Open <http://127.0.0.1:3100/app?at=2230>. The demo then starts at 22:30 Lagos
 time, when speeding happens, so alerts arrive within a minute.
 
 | # | Do this | NVDA should say (roughly) | What it said | OK? |

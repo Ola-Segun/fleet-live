@@ -81,10 +81,21 @@ export function Header() {
   const open = openPath === pathname;
 
   useEffect(() => {
-    const updateScrollState = () => setScrolled(window.scrollY > 10);
+    let frame = 0;
+    const updateScrollState = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const next = window.scrollY > 10;
+        setScrolled((current) => (current === next ? current : next));
+      });
+    };
     updateScrollState();
     window.addEventListener("scroll", updateScrollState, { passive: true });
-    return () => window.removeEventListener("scroll", updateScrollState);
+    return () => {
+      window.removeEventListener("scroll", updateScrollState);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {

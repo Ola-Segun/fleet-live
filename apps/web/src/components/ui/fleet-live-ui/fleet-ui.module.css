@@ -129,8 +129,8 @@
   inset: 0 0 auto;
   height: 60px;
   pointer-events: none;
+  background-color: transparent;
   background:
-    linear-gradient(var(--e), var(--e)) 0 0 / 100% 4px no-repeat,
     radial-gradient(circle at 4px 4px, var(--e) 3.7px, transparent 4.2px) 0 0 / 8px 8px repeat-x,
     radial-gradient(circle at 4px 4px, var(--e) 3.1px, transparent 3.6px) 0 8px / 8px 8px repeat-x,
     radial-gradient(circle at 4px 4px, var(--e) 2.5px, transparent 3px) 0 16px / 8px 8px repeat-x,
@@ -569,7 +569,7 @@
 .flow {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--flow-columns, 4), minmax(0, 1fr));
   gap: clamp(12px, 1.4vw, 20px);
   padding: 50px clamp(16px, 1.6vw, 24px) clamp(16px, 1.6vw, 24px);
 }
@@ -782,6 +782,10 @@
 /* ---------- timeline ---------- */
 
 .tl {
+  --node-size: 48px;
+  --rail-center: 24px;
+  --node-half: 24px;
+  --progress: 0;
   position: relative;
   display: grid;
   gap: 16px;
@@ -795,48 +799,53 @@
   bottom: 28px;
   width: 2px;
   border-radius: 2px;
-  background:
-    linear-gradient(to bottom, var(--c-led) 0, var(--c-led) var(--fill), transparent var(--fill)),
-    repeating-linear-gradient(to bottom, var(--c-line-2) 0 4px, transparent 4px 9px);
-  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--c-led) 50%, transparent);
+  background: repeating-linear-gradient(to bottom, var(--c-line-2) 0 4px, transparent 4px 9px);
+}
+
+.rail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, var(--c-led), color-mix(in srgb, var(--c-led) 72%, transparent));
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--c-led) 60%, transparent);
+  transform: scaleY(var(--progress));
+  transform-origin: top;
+  will-change: transform;
 }
 
 .tlRow {
   position: relative;
 }
 
-.tlNode {
+.tlActiveNode {
   position: absolute;
-  top: 18px;
-  left: -76px;
+  top: var(--marker-top, 18px);
+  left: calc(var(--rail-center) - var(--node-half));
+  z-index: 2;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: var(--node-size);
+  height: var(--node-size);
   border-radius: 50%;
-  background: var(--c-card-solid);
   font: 500 12px/1 var(--fl-mono);
-  color: var(--c-muted);
-  box-shadow: 0 0 0 1px var(--c-line-2);
-}
-
-.nodeCurrent {
   color: #0b1306;
   background: linear-gradient(180deg, var(--fl-lime-hi), var(--fl-lime-lo));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
     0 0 0 5px color-mix(in srgb, var(--c-led) 22%, transparent),
     0 0 26px color-mix(in srgb, var(--c-led) 55%, transparent);
+  transition:
+    color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
 }
 
-.nodeNext {
-  color: var(--c-accent);
-  box-shadow: 0 0 0 1px var(--c-led);
-}
-
-.nodeFuture {
-  box-shadow: 0 0 0 1px var(--c-line-2);
-  background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(var(--c-dot), 0.07) 4px 5px);
+.tlRow > article {
+  transition:
+    border-color 240ms ease,
+    background 240ms ease,
+    box-shadow 240ms ease;
 }
 
 .chips {
@@ -1303,19 +1312,26 @@
     display: none;
   }
   .tl {
+    --node-size: 38px;
+    --rail-center: 12px;
+    --node-half: 19px;
     padding-left: 52px;
   }
   .rail {
     left: 11px;
   }
-  .tlNode {
-    left: -52px;
-    width: 38px;
-    height: 38px;
+  .tlActiveNode {
     font-size: 11px;
   }
   .principles li {
     grid-template-columns: 28px minmax(0, 1fr);
     gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tlActiveNode,
+  .tlRow > article {
+    transition: none;
   }
 }

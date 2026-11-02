@@ -12,10 +12,10 @@
  * checked via WEBGL_debug_renderer_info). The comparison is fair because only
  * the layer changes.
  */
-import { BASE_URL, READY_MS, launchBrowser, timing } from "./browser.mts";
+import { DEMO_URL, READY_MS, launchBrowser, timing } from "./browser.mts";
 
 const query = process.argv[2] ?? "";
-const base = BASE_URL;
+const base = DEMO_URL;
 const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors: string[] = [];
