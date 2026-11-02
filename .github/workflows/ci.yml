@@ -2,6 +2,7 @@
 #
 #   check    typecheck (packages, app, browser scripts), lint, 224 unit and
 #            property tests, a production build, and the bundle budget
+#   cloudflare OpenNext Worker build and Wrangler dry-run on Linux
 #   browser  every browser check against the built app, in Chromium with
 #            software WebGL. Functional and accessibility checks gate; frame
 #            times are measured but not gated here (no GPU on the runner).
@@ -36,7 +37,6 @@ jobs:
       - run: pnpm bundle:size
 
   cloudflare:
-    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
