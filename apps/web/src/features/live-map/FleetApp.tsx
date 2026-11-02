@@ -14,7 +14,14 @@ import { MODE_LABEL } from "@/lib/fleet-view";
 import { parseUi, writeUi, type UiState } from "@/lib/ui-url";
 import { setShortcutsOn, useShortcutsOn } from "@/lib/shortcuts-setting";
 import { setTheme, useDarkTheme } from "@/lib/theme-setting";
-import { configFromSearch } from "@/lib/worker-messages";
+import { configFromSearch, type FleetConfig } from "@/lib/worker-messages";
+import {
+  DEFAULT_DEMO_CONFIG,
+  hasSimulationOverrides,
+  readDemoConfig,
+  saveDemoConfig,
+  type DemoConfig,
+} from "@/lib/simulation-settings";
 import { AlertsPanel, type AlertAction } from "./AlertsPanel";
 import { FleetPanel } from "./FleetPanel";
 import { PanelTabs, type PanelTab } from "./PanelTabs";
@@ -24,6 +31,7 @@ import type { TruckLayerKind } from "./LiveMap";
 import { PerfHud } from "./PerfHud";
 import { StatusBar } from "./StatusBar";
 import { VehicleDrawer } from "./VehicleDrawer";
+import { SimulationSetup } from "./SimulationSetup";
 import { useFleet } from "./use-fleet";
 
 // MapLibre needs `window` and WebGL, so the map is client-only. The page shell
@@ -46,13 +54,24 @@ const NO_ALERTS: readonly Alert[] = [];
 
 export function FleetApp() {
   const params = useSearchParams();
+  // Read once: the URL wins over saved preferences, while ordinary visits reuse this browser's setup.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialParams = useMemo(() => new URLSearchParams(params.toString()), []);
   // Read once: afterwards the map owns the camera and this component owns the view, and both write back to the URL.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initialCamera = useMemo(() => parseCamera(params.get("c")) ?? DEFAULT_CAMERA, []);
+  const initialCamera = useMemo(() => parseCamera(initialParams.get("c")) ?? DEFAULT_CAMERA, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const config = useMemo(() => configFromSearch(new URLSearchParams(params.toString())), []);
+  const initialConfig = useMemo(() => configFromSearch(initialParams), []);
+  const [config, setConfig] = useState<FleetConfig>(initialConfig);
+  const [configurationReady, setConfigurationReady] = useState(false);
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsStorageWarning, setSettingsStorageWarning] = useState(false);
   const [ui, setUi] = useState<UiState>(() => parseUi(new URLSearchParams(params.toString())));
-  const { status, error, subscribe, gpu, vehicles, alerts: alertsMessage, send } = useFleet(config);
+  const { status, error, subscribe, gpu, vehicles, alerts: alertsMessage, send } = useFleet(
+    config,
+    configurationReady && !setupRequired,
+  );
   const zones = useZones();
   const [tab, setTab] = useState<PanelTab>("trucks");
   const [draft, setDraft] = useState<[number, number][] | null>(null);
@@ -74,6 +93,44 @@ export function FleetApp() {
   const dark = useDarkTheme();
   // Single-key shortcuts can be switched off (WCAG 2.1.4).
   const shortcuts = useShortcutsOn();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const fromUrl = configFromSearch(initialParams);
+      if (fromUrl.mode === "network" || hasSimulationOverrides(initialParams)) {
+        setConfig(fromUrl);
+        if (
+          fromUrl.mode === "demo" &&
+          (initialParams.has("n") || initialParams.has("seed") || initialParams.has("at"))
+        ) {
+          setSettingsStorageWarning(!saveDemoConfig(fromUrl));
+        }
+      } else {
+        const saved = readDemoConfig();
+        if (saved.config) setConfig(saved.config);
+        else setSetupRequired(true);
+        setSettingsStorageWarning(!saved.available);
+      }
+      setConfigurationReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialParams]);
+
+  const applyDemoConfig = useCallback((next: DemoConfig) => {
+    setSettingsStorageWarning(!saveDemoConfig(next));
+    setConfig(next);
+    setConfigurationReady(true);
+    setSetupRequired(false);
+    setSettingsOpen(false);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("n");
+    url.searchParams.delete("seed");
+    url.searchParams.delete("at");
+    url.searchParams.delete("mode");
+    url.searchParams.delete("ws");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   const patch = useCallback(
     (p: Partial<UiState>) =>
@@ -323,6 +380,15 @@ export function FleetApp() {
             <span aria-hidden>{dark ? "☾" : "☀"}</span>
             Dark mode
           </button>
+          {config.mode === "demo" && configurationReady && !setupRequired && (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="min-h-8 rounded-md border border-control px-2 text-xs text-muted hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Simulation settings
+            </button>
+          )}
           <Link href="/" className="hidden min-h-8 items-center rounded-md px-2 text-xs font-medium text-muted hover:bg-hover hover:text-fg focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex">
             Product site
           </Link>
@@ -337,24 +403,32 @@ export function FleetApp() {
         )}
 
         <main className="relative min-w-0 flex-1">
-          <LiveMap
-            initialCamera={initialCamera}
-            subscribe={subscribe}
-            gpu={gpu}
-            layer={layer}
-            selected={ui.vehicle}
-            follow={ui.follow}
-            onPick={select}
-            onUserMove={() => patch({ follow: false })}
-            dark={dark}
-            zones={zones}
-            draft={draft}
-            onDraftCorner={addCorner}
-            onCentre={(c) => {
-              centre.current = c;
-            }}
-            focusZone={focusZone}
-          />
+          {configurationReady && !setupRequired ? (
+            <LiveMap
+              initialCamera={initialCamera}
+              subscribe={subscribe}
+              gpu={gpu}
+              layer={layer}
+              selected={ui.vehicle}
+              follow={ui.follow}
+              onPick={select}
+              onUserMove={() => patch({ follow: false })}
+              dark={dark}
+              zones={zones}
+              draft={draft}
+              onDraftCorner={addCorner}
+              onCentre={(c) => {
+                centre.current = c;
+              }}
+              focusZone={focusZone}
+            />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center bg-hover p-6 text-center">
+              <p className="max-w-sm text-sm leading-6 text-muted">
+                Choose your fleet size and scenario to start the interactive demo.
+              </p>
+            </div>
+          )}
           {desktop && drawer && <div className="absolute right-3 top-3 z-10 w-80">{drawer}</div>}
           {/* Desktop: along the bottom, above the map's attribution line (the data licences require it be
               visible; the README screenshot showed the bar covering it) and clear of the zoom controls.
@@ -401,6 +475,17 @@ export function FleetApp() {
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
+      {(setupRequired || settingsOpen) && config.mode === "demo" && (
+        <SimulationSetup
+          key={settingsOpen ? "settings" : "first-run"}
+          config={config}
+          required={setupRequired}
+          saveWarning={settingsStorageWarning}
+          onApply={applyDemoConfig}
+          onReset={() => applyDemoConfig(DEFAULT_DEMO_CONFIG)}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }

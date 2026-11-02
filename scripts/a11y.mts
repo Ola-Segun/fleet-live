@@ -11,10 +11,10 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
+import { DEMO_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 import { mkdirSync, writeFileSync } from "node:fs";
 
-const base = BASE_URL;
+const base = DEMO_URL;
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 const browser = await launchBrowser();
 mkdirSync("docs/a11y", { recursive: true });

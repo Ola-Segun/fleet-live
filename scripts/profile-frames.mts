@@ -7,12 +7,12 @@
  *   pnpm --filter @fleet/web build && pnpm --filter @fleet/web start -p 3100
  *   pnpm profile:frames [query]
  */
-import { BASE_URL, READY_MS, launchBrowser } from "./browser.mts";
+import { DEMO_URL, READY_MS, launchBrowser } from "./browser.mts";
 
 const query = process.argv[2] ?? "";
 const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto(BASE_URL + query);
+await page.goto(DEMO_URL + query);
 await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
 await page.waitForSelector('[role="option"]');
 await page.locator('[role="option"]').nth(3).click(); // a selection and the detail panel, as in the UI check

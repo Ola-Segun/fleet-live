@@ -11,9 +11,9 @@
  *   pnpm smoke:alerts
  */
 import type { Page } from "@playwright/test";
-import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
+import { DEMO_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 
-const base = `${BASE_URL}?at=2230`;
+const base = `${DEMO_URL}?at=2230`;
 const browser = await launchBrowser();
 const results: [string, boolean, string][] = [];
 const check = (name: string, ok: boolean, detail = "") => results.push([name, ok, detail]);

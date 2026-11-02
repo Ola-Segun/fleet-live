@@ -9,8 +9,9 @@ were taken with. Change one, then rerun the matching evaluation (see
 
 ## 1 · URL options (the web app)
 
-All URL input is untrusted and parsed strictly. Anything invalid falls back
-to the default, never to a broken page.
+The interactive console is available at `/app`. All console URL input is
+untrusted and parsed strictly. Anything invalid falls back to the default,
+never to a broken page.
 
 ### Data source
 
@@ -45,6 +46,15 @@ reopens the same view.
 
 Replay time isn't in the URL, because history lives in the browser session
 (see [ROADMAP.md](ROADMAP.md)).
+
+On the first visit to `/app`, a short setup lets you choose the simulated
+vehicle count, Lagos start time, and optional repeatable seed (blank uses the
+default scenario). The choices are saved in `fleet-live:simulation` in that
+browser and can be changed later with
+**Simulation settings**. URL options above take precedence for that visit;
+invalid saved settings are ignored. Product-site demo links open the same setup
+in a popup before launch; those choices are passed to `/app` and saved in the
+same browser setting.
 
 ## 2 · Browser storage (per visitor)
 

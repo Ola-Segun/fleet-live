@@ -1,9 +1,9 @@
 # Fleet Live
 
-A dispatcher's live map of 5,000 trucks on real Lagos roads, drawn smoothly
-from a GPS feed that arrives late, out of order, twice or not at all. You can
-find and follow any truck, watch for alerts, draw zones, and replay the last
-hour.
+A dispatcher's live map of 5,000 simulated trucks moving along real Lagos
+routes, drawn smoothly from a GPS feed that arrives late, out of order, twice
+or not at all. You can find and follow any truck, watch for alerts, draw zones,
+and replay the last hour.
 
 ![Fleet Live: 5,000 trucks over Lagos, a truck selected, the list beside the map](docs/images/overview-light.png)
 
@@ -12,6 +12,10 @@ hour.
 | ![Dark mode with the alert list and alerting trucks as violet diamonds](docs/images/alerts-dark.png) | ![Replaying the fleet at an earlier time](docs/images/replay.png) | ![The phone layout with the bottom sheet open](docs/images/phone.png) |
 
 **Live demo:** _not deployed yet_ (see [docs/DEPLOY.md](docs/DEPLOY.md)).
+
+The public product site is the app root; the interactive fleet console is at
+`/app`. Product, use-case, engineering, and roadmap pages explain the product
+direction while distinguishing the simulated demo from future capabilities.
 
 The trucks, their trackers and the network are simulated: a seeded simulator
 drives them on 600 real routes and then makes the feed misbehave on purpose.
@@ -61,6 +65,9 @@ pnpm install
 pnpm --filter @fleet/web dev          # http://localhost:3000
 ```
 
+Open <http://localhost:3000> for the product site or
+<http://localhost:3000/app> for the interactive console.
+
 URL options:
 
 | Option | Effect |
@@ -71,6 +78,8 @@ URL options:
 | `?hud=1` | A performance overlay |
 | `?layer=baseline` | The stock GeoJSON layer the WebGL layer replaced, for comparison |
 | `?mode=network&ws=ws://127.0.0.1:8787/stream` | Network mode, against `pnpm --filter @fleet/sim-server start` |
+
+Append console options to `/app`, for example `/app?at=2230`.
 
 ## Checks
 

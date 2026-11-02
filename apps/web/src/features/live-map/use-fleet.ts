@@ -19,7 +19,7 @@ export type RowsListener = (rows: RowsMessage, receivedAt: number) => void;
  * them (the map) `subscribe` and do their own imperative update. Only the small
  * status report is state, because the status bar genuinely renders it.
  */
-export function useFleet(config: FleetConfig) {
+export function useFleet(config: FleetConfig, enabled = true) {
   const [status, setStatus] = useState<FleetStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Plate and driver by vehicle id. Arrives once; the map works with ids until then.
@@ -39,6 +39,7 @@ export function useFleet(config: FleetConfig) {
   const key = JSON.stringify(config);
 
   useEffect(() => {
+    if (!enabled) return;
     const worker = new Worker(new URL("../../workers/fleet.worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (event: MessageEvent<WorkerToMain>) => {
       const message = event.data;
@@ -72,7 +73,7 @@ export function useFleet(config: FleetConfig) {
       worker.postMessage({ type: "stop" } satisfies MainToWorker);
       worker.terminate();
     };
-  }, [key, gpu]);
+  }, [enabled, key, gpu]);
 
   const subscribe = useCallback((listener: SnapshotListener) => {
     listeners.current.add(listener);

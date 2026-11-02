@@ -10,7 +10,7 @@
  */
 import { mkdirSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { BASE_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
+import { DEMO_URL, EVENT_MS, READY_MS, launchBrowser } from "./browser.mts";
 
 const OUT = "docs/images";
 mkdirSync(OUT, { recursive: true });
@@ -26,7 +26,7 @@ async function open(query: string, options: { dark?: boolean; phone?: boolean } 
     colorScheme: options.dark ? "dark" : "light",
   });
   const page = await context.newPage();
-  await page.goto(BASE_URL + query);
+  await page.goto(DEMO_URL + query);
   await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
   await page.waitForSelector('[role="option"], [aria-controls="fleet-sheet"]');
   return page;

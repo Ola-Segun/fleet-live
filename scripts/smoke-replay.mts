@@ -12,7 +12,7 @@
  *   pnpm smoke:replay
  */
 import type { Page } from "@playwright/test";
-import { BASE_URL, EVENT_MS, READY_MS, SOFTWARE_TIMING, launchBrowser, timing } from "./browser.mts";
+import { DEMO_URL, EVENT_MS, READY_MS, SOFTWARE_TIMING, launchBrowser, timing } from "./browser.mts";
 
 const browser = await launchBrowser();
 const results: [string, boolean, string][] = [];
@@ -23,7 +23,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const page: Page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto(`${BASE_URL}?at=2230`); // light traffic: plenty of moving trucks to track, whatever the hour
+await page.goto(`${DEMO_URL}?at=2230`); // light traffic: plenty of moving trucks to track, whatever the hour
 await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
 await page.waitForSelector('[role="option"]');
 
