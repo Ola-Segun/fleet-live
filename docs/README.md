@@ -44,7 +44,7 @@ Start with the path for what you need. Every document links onward.
 | Document | What's in it |
 | --- | --- |
 | [QUALITY.md](QUALITY.md) | What CI gates, what it only records, and why |
-| [DEPLOY.md](DEPLOY.md) | Deploying the demo (Vercel or any Next.js host) |
+| [DEPLOY.md](DEPLOY.md) | Deploying the demo to Cloudflare Workers, Vercel, or another Next.js host |
 | [OPERATIONS.md](OPERATIONS.md) | Deployment shapes, running the server in the cloud, CI failures, diagnosing a running app |
 | [BACKEND.md](BACKEND.md) | **Proposal:** from simulation to real trucks: device gateway, message bus, stream service, database schema, API, auth, privacy, server-side alerts, observability, a phased plan |
 | [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md) | **Everything needed to make it a real product:** the minimum sellable product, backend and admin work, customer features (trips, reports, dispatch, driver app), hardware and SIMs, operations, security, Nigerian legal and data protection, business, team, order of work |

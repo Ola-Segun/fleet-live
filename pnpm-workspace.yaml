@@ -1,6 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+onlyBuiltDependencies:
+  - workerd
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

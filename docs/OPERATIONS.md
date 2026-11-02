@@ -9,7 +9,7 @@ what changes once a backend exists ([BACKEND.md](BACKEND.md)).
 
 | Shape | What runs | Hosting | Guide |
 | --- | --- | --- | --- |
-| **Static demo** (today) | The Next.js app; the simulator runs in each visitor's browser | Vercel, or any host that runs `next build` and `next start` | [DEPLOY.md](DEPLOY.md) |
+| **Static demo** (today) | The Next.js app; the simulator runs in each visitor's browser | Cloudflare Workers via OpenNext, Vercel, or any host that runs `next build` and `next start` | [DEPLOY.md](DEPLOY.md) |
 | **Demo + relay** | The app plus `apps/sim-server` for network mode | The app on Vercel; the server on a container host (Fly.io, Render, Railway) behind TLS | §3 |
 | **Production** | Gateway, bus, framer, stream nodes, API, database | Containers or Kubernetes, plus managed PostgreSQL and Redis | [BACKEND.md](BACKEND.md) |
 
@@ -67,7 +67,7 @@ CMD ["pnpm", "--filter", "@fleet/sim-server", "start"]
 
 | Workflow | Trigger | Does |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | Every push to `main`, and pull requests | `check` job: typecheck, lint, tests, build, bundle budget. `browser` job: every browser check in Chromium with software WebGL; screenshots and accessibility trees kept as artifacts |
+| `.github/workflows/ci.yml` | Every push to `main`, and pull requests | `check` job: typecheck, lint, tests, build, bundle budget. `cloudflare` job: OpenNext build and Wrangler dry-run on Linux. `browser` job: every browser check in Chromium with software WebGL; screenshots and accessibility trees kept as artifacts |
 | `.github/workflows/evaluate.yml` | Mondays 04:00 UTC, and on demand | The evaluations and benchmarks; output kept as artifacts |
 
 When CI fails:
