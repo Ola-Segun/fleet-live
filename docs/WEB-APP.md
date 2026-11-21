@@ -20,23 +20,11 @@ Tailwind CSS 4, and raw WebGL2.
 apps/web/src/
   app/
     layout.tsx          <html>: fonts, the inline theme script (before first paint), metadata, and Fleet UI tokens
-    page.tsx            public product home; the animated signal-dial and ascent hero
-    app/page.tsx        interactive console: <Suspense><FleetApp/></Suspense> (useSearchParams needs the boundary)
-    platform/page.tsx   demo capability overview
-    use-cases/page.tsx  intended users and product hypotheses
-    engineering/page.tsx measured technical case study
-    product-direction/page.tsx staged roadmap, with current limits
-    design-system/page.tsx visual library of shared tokens, live UI specimens, and signature flow, roadmap, and scope-boundary patterns
-    globals.css         Tailwind + colour tokens (light, dark, data-theme overrides)
+    page.tsx            fleet console at /; reuses the /app entry point
+    app/page.tsx        <Suspense><FleetApp/></Suspense> (useSearchParams needs the boundary)
+    globals.css         Tailwind and app colour tokens (light, dark, data-theme overrides)
   components/
-    site-shell.tsx      shared public page shell, 90rem content width, reusable animated footer, and 60svh-minimum static SiteHero
-    ui/
-      header-2.tsx      single responsive public navbar; floating glass panel, solid on scroll
-      site-navigation.ts  shared public-site destinations used by the navbar and footer
-      dithered-shader-background-1.tsx   subtle decorative shader for dark site sections; starts on mount and respects reduced motion
-      fleet-live-footer/ reusable public footer with a full-footer, scroll-linked Canvas2D dot wordmark; eases dot travel, caches stable layouts, and pauses offscreen/hidden
-      fleet-live-ui/     reusable section, panel, button, stat, flow, use-case, boundary, and roadmap compositions for public inner pages
-      fleet-live-hero/  full-height Canvas2D signal-dial and ascent scene, pointer response, simulated alert, and motion-aware copy/counters
+    ui/fleet-live-mark.tsx  shared application brand mark
   workers/
     fleet.worker.ts     glue: page messages ↔ FleetCore; builds demo or network sources
   features/live-map/
@@ -67,21 +55,11 @@ apps/web/src/
     snapshot-geojson.ts the baseline layer's data (?layer=baseline)
 ```
 
-The homepage Canvas2D scene takes noisy vehicle reports through the signal dial,
-then converges their lanes through a braking bend into a vertical launch channel.
-The channel uses machined guard rails, glass-like hoops, and accelerating signal
-trails. Its renderer reuses per-frame vehicle placements and ascent geometry,
-caches resize-dependent atmosphere gradients, caps its backing-store density at
-1.5 device pixels per CSS pixel (with a 12-million-pixel upper bound), and pauses
-while offscreen or the tab is hidden. Reduced-motion mode renders one settled
-frame.
-
-The shared Fleet UI tokens are loaded once by the root layout. `SiteShell`
-provides Next.js links to its content subtree, leaving the shared navigation
-and footer outside the UI-kit provider. The platform, use-case, engineering,
-product-direction, and design-system pages reuse the kit's section and
-data-specific compositions. The landing hero's existing copy, navigation, and
-footer remain unchanged.
+The product website is a separate private project with its own pages, design
+system, artwork, checks, dependencies, and deployment. This application does not
+import its source or depend on its repository. The website can link to `/app`
+with the documented `n`, `seed`, and `at` query parameters; the application
+validates those options and owns all fleet state.
 
 ## 2 · The component tree
 

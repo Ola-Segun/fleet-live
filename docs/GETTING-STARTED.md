@@ -34,17 +34,15 @@ source.
 > **Windows:** run the commands in PowerShell or Git Bash. If an install
 > stalls, run `pnpm install --reporter=append-only` to see progress.
 
-## 3 · Run the product site and console (demo mode)
+## 3 · Run the fleet console (demo mode)
 
 ```sh
 pnpm --filter @fleet/web dev
 ```
 
-Open <http://localhost:3000> for the public product site, then choose **Open
-interactive demo** or go directly to <http://localhost:3000/app> for the
-dispatcher console. In demo mode the simulator runs inside the browser's
-Worker. It warms up 30 simulated seconds, then 5,000 trucks start moving,
-about 4 seconds after the console opens.
+Open <http://localhost:3000> for the fleet console. The `/app` route remains
+available for existing links. The product website lives in its own private
+repository and is not part of this installation.
 
 Try:
 

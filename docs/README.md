@@ -19,7 +19,7 @@ Start with the path for what you need. Every document links onward.
 
 | Document | What's in it |
 | --- | --- |
-| [../apps/web/README.md](../apps/web/README.md) | Public pages, the interactive demo route, and local web-app commands |
+| [WEB-APP.md](WEB-APP.md) | The standalone fleet console, its routes, UI, and application code |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The architecture type and style; the tech stack; the life of a ping, from tracker to pixel; time; state ownership; failure modes; the performance budget; a code map |
 | [TYPES.md](TYPES.md) | Every data type and message contract: network, Worker ↔ page, GPU texture, alerts and zones, replay, URL state |
 | [PROTOCOL.md](PROTOCOL.md) | The wire protocol spec: endpoints, session (hello, resume, snapshot, close codes), the byte layout, implementing a compatible server, versioning |

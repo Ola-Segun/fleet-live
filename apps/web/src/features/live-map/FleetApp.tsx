@@ -384,9 +384,6 @@ export function FleetApp() {
               Simulation settings
             </button>
           )}
-          <Link href="/" className="hidden min-h-8 items-center rounded-md px-2 text-xs font-medium text-muted hover:bg-hover hover:text-fg focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex">
-            Product site
-          </Link>
         </div>
         <StatusBar status={status} error={error} subscribe={subscribe} />
       </header>

@@ -13,10 +13,10 @@ and replay the last hour.
 
 **Live demo:** _not deployed yet_ (see [docs/DEPLOY.md](docs/DEPLOY.md)).
 
-The public product site is the app root; the interactive fleet console is at
-`/app`. Product, use-case, engineering, roadmap, and design-system pages explain
-the product direction, document its interface, and distinguish the simulated
-demo from future capabilities.
+This repository contains the fleet system only: the interactive console,
+simulation, feed processing, rendering, alerts, replay, and supporting engineering
+documentation. Both `/` and `/app` open the console. The product website is
+maintained in a separate private repository and is not needed to run this project.
 
 The trucks, their trackers and the network are simulated: a seeded simulator
 drives them on 600 real routes and then makes the feed misbehave on purpose.
@@ -66,8 +66,8 @@ pnpm install
 pnpm --filter @fleet/web dev          # http://localhost:3000
 ```
 
-Open <http://localhost:3000> for the product site or
-<http://localhost:3000/app> for the interactive console.
+Open <http://localhost:3000> for the interactive console. Existing
+<http://localhost:3000/app> links remain supported.
 
 URL options:
 
@@ -85,7 +85,7 @@ Append console options to `/app`, for example `/app?at=2230`.
 ## Checks
 
 ```sh
-pnpm check                            # typecheck, lint, 224 unit and property tests
+pnpm check                            # typecheck, lint, unit and property tests
 pnpm --filter @fleet/web build && pnpm bundle:size
 pnpm --filter @fleet/web start -p 3100 &
 pnpm smoke:all                        # every browser check, in Chrome
