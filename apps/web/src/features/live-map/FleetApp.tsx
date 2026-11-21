@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { FleetLiveMark } from '@/components/ui/fleet-live-mark';
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Alert } from "@fleet/alerts";
@@ -354,13 +355,7 @@ export function FleetApp() {
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2">
         <div className="flex items-center gap-3">
           <Link href="/" className="inline-flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-            <span className="grid size-7 place-items-center rounded-md bg-[#c8ed73] text-[#102333]" aria-hidden="true">
-              <svg viewBox="0 0 24 24" className="size-4" fill="none">
-                <path d="M4 16.5 9 7l4 7 2.5-4 4.5 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="5" cy="17" r="1.5" fill="currentColor" />
-                <circle cx="19" cy="17" r="1.5" fill="currentColor" />
-              </svg>
-            </span>
+            <FleetLiveMark size={28} />
             <h1 className="text-base font-semibold">Fleet Live <span className="text-xs font-normal text-muted">Demo</span></h1>
           </Link>
           <button

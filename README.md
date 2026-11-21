@@ -14,8 +14,9 @@ and replay the last hour.
 **Live demo:** _not deployed yet_ (see [docs/DEPLOY.md](docs/DEPLOY.md)).
 
 The public product site is the app root; the interactive fleet console is at
-`/app`. Product, use-case, engineering, and roadmap pages explain the product
-direction while distinguishing the simulated demo from future capabilities.
+`/app`. Product, use-case, engineering, roadmap, and design-system pages explain
+the product direction, document its interface, and distinguish the simulated
+demo from future capabilities.
 
 The trucks, their trackers and the network are simulated: a seeded simulator
 drives them on 600 real routes and then makes the feed misbehave on purpose.

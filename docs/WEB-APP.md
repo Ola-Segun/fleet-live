@@ -26,9 +26,10 @@ apps/web/src/
     use-cases/page.tsx  intended users and product hypotheses
     engineering/page.tsx measured technical case study
     product-direction/page.tsx staged roadmap, with current limits
+    design-system/page.tsx visual library of shared tokens, live UI specimens, and signature flow, roadmap, and scope-boundary patterns
     globals.css         Tailwind + colour tokens (light, dark, data-theme overrides)
   components/
-    site-shell.tsx      shared public page shell, 90rem content width, reusable animated footer, and 70svh-minimum static SiteHero
+    site-shell.tsx      shared public page shell, 90rem content width, reusable animated footer, and 60svh-minimum static SiteHero
     ui/
       header-2.tsx      single responsive public navbar; floating glass panel, solid on scroll
       site-navigation.ts  shared public-site destinations used by the navbar and footer
@@ -78,9 +79,9 @@ frame.
 The shared Fleet UI tokens are loaded once by the root layout. `SiteShell`
 provides Next.js links to its content subtree, leaving the shared navigation
 and footer outside the UI-kit provider. The platform, use-case, engineering,
-and product-direction pages reuse the kit's section and data-specific
-compositions. The landing hero's existing copy, navigation, and footer remain
-unchanged.
+product-direction, and design-system pages reuse the kit's section and
+data-specific compositions. The landing hero's existing copy, navigation, and
+footer remain unchanged.
 
 ## 2 · The component tree
 
