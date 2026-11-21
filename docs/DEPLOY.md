@@ -32,9 +32,27 @@ The Worker name and compatibility date are set in
 in the Worker settings after the first deployment. CI runs an OpenNext build
 and Wrangler dry-run on Linux; it does not deploy automatically.
 
-The site and `/app` run without a backend: the simulated fleet runs in each
+Both `/` and `/app` serve the fleet console without a backend: the simulated fleet runs in each
 visitor's browser. Network mode is not included in this deployment; it requires
 a separately hosted `apps/sim-server` with a public `wss://` endpoint.
+
+For Cloudflare Workers Git integration, use the repository root so pnpm can
+resolve the workspace packages. Use `pnpm --filter @fleet/web cf:build` as the
+build command and `pnpm --filter @fleet/web exec opennextjs-cloudflare deploy`
+as the deploy command. Use Node 22 and pnpm 10.14.0. The Worker name is
+`fleet-live`; use Workers with OpenNext, rather than a static Pages upload.
+
+## Connecting a separate product website
+
+Deploy this console first. Give the website the deployed console URL, including
+`/app`, as its `FLEET_APP_URL` build and runtime variable. The website's `/app`
+endpoint redirects the browser here with the supported `n`, `seed`, and `at`
+scenario options. The console accepts these on both `/` and `/app`.
+
+The website can live on another Worker or domain. No CORS configuration, shared
+cookies, or access to its private repository is required. Product pages are not
+included in this repository or deployment. Changing the console domain requires
+updating the website's destination configuration.
 
 ## Vercel
 

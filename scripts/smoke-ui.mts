@@ -18,10 +18,22 @@ const errors: string[] = [];
 const param = (page: Page, key: string) => new URL(page.url()).searchParams.get(key);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+async function startFirstVisitDemo(page: Page) {
+  // A fresh browser must choose a scenario before the map is mounted.
+  await page.waitForFunction(
+    `window.__fleetPerf?.layer || [...document.querySelectorAll('button')].some(button => button.textContent?.trim() === 'Start demo')`,
+    undefined,
+    { timeout: READY_MS },
+  );
+  const start = page.getByRole("button", { name: "Start demo", exact: true });
+  if (await start.isVisible()) await start.click();
+}
+
 async function ready(page: Page, url: string) {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(url);
+  await startFirstVisitDemo(page);
   await page.waitForFunction("window.__fleetPerf?.layer?.frames > 60", undefined, { timeout: READY_MS });
   await page.waitForSelector('[role="option"]', { timeout: READY_MS });
 }
@@ -211,6 +223,7 @@ await page.close();
 const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 phone.on("pageerror", (e) => errors.push(String(e)));
 await phone.goto(base);
+await startFirstVisitDemo(phone);
 await phone.waitForFunction("window.__fleetPerf?.layer?.frames > 30", undefined, { timeout: READY_MS });
 const mapBox = await phone.locator(".maplibregl-map").boundingBox();
 check("phone: the map fills the width", mapBox !== null && mapBox.width >= 389);
